@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { BotControlPanel } from "./BotControlPanel";
 
 interface ServerConfig {
   id: string;
@@ -17,6 +18,13 @@ interface ServerConfig {
   connected?: boolean;
   serverAddress?: string;
   version?: string;
+  players?: string[];
+  modes?: {
+    follow?: boolean;
+    autoAttack?: boolean;
+    patrol?: boolean;
+    mining?: boolean;
+  };
 }
 
 export function MultiServerPanel() {
@@ -168,49 +176,61 @@ export function MultiServerPanel() {
             {serverList.map((server: any) => (
               <div
                 key={server.id}
-                className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                className="p-3 rounded-lg border bg-card"
               >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      server.connected ? "bg-green-500" : "bg-gray-400"
-                    }`}
-                  />
-                  <div>
-                    <div className="font-medium">{server.serverName || server.name || server.id}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {server.serverAddress || `${server.host}:${server.port}`}
-                      {server.username && ` (${server.username})`}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        server.connected ? "bg-green-500" : "bg-gray-400"
+                      }`}
+                    />
+                    <div>
+                      <div className="font-medium">{server.serverName || server.name || server.id}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {server.serverAddress || `${server.host}:${server.port}`}
+                        {server.username && ` (${server.username})`}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {server.connected && (
-                    <Badge variant="secondary" className="text-xs">
-                      {server.version}
+                  <div className="flex items-center gap-2">
+                    {server.connected && (
+                      <Badge variant="secondary" className="text-xs">
+                        {server.version}
+                      </Badge>
+                    )}
+                    <Badge variant={server.connected ? "default" : "outline"}>
+                      {server.connected ? "在线" : "离线"}
                     </Badge>
-                  )}
-                  <Badge variant={server.connected ? "default" : "outline"}>
-                    {server.connected ? "在线" : "离线"}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRestartServer(server.id)}
-                    disabled={loading}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemoveServer(server.id)}
-                    disabled={loading}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRestartServer(server.id)}
+                      disabled={loading}
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveServer(server.id)}
+                      disabled={loading}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+
+                {/* 行为控制面板 */}
+                <BotControlPanel
+                  botId={server.id}
+                  botName={server.username || server.name}
+                  connected={server.connected || false}
+                  modes={server.modes}
+                  players={server.players}
+                  onUpdate={fetchServers}
+                />
               </div>
             ))}
           </div>

@@ -341,6 +341,74 @@ app.post('/api/bots/:id/restart', async (req, res) => {
   }
 });
 
+// ===== Behavior Control APIs =====
+
+// Set behavior for a specific bot
+app.post('/api/bots/:id/behavior', (req, res) => {
+  try {
+    const { behavior, enabled, options } = req.body;
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = bot.setBehavior(behavior, enabled, options || {});
+    res.json({ success: result.success, message: result.message, status: bot.getStatus() });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Execute action for a specific bot
+app.post('/api/bots/:id/action', (req, res) => {
+  try {
+    const { action, params } = req.body;
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = bot.doAction(action, params || {});
+    res.json({ success: result.success, message: result.message });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Stop all behaviors for a specific bot
+app.post('/api/bots/:id/stop-all', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    if (bot.behaviors) {
+      bot.behaviors.stopAll();
+      bot.modes.follow = false;
+      bot.modes.autoAttack = false;
+      bot.modes.patrol = false;
+      bot.modes.mining = false;
+    }
+    res.json({ success: true, status: bot.getStatus() });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Get behavior status for a specific bot
+app.get('/api/bots/:id/behaviors', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    res.json({
+      modes: bot.modes,
+      behaviors: bot.behaviors?.getStatus() || null
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Serve frontend for all other routes
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));

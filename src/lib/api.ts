@@ -254,6 +254,29 @@ class ApiService {
   async restartBot(id: string): Promise<{ success: boolean; status: BotStatus }> {
     return this.request(`/api/bots/${id}/restart`, { method: 'POST' });
   }
+
+  // Behavior Control
+  async setBehavior(id: string, behavior: string, enabled: boolean, options?: Record<string, unknown>): Promise<{ success: boolean; message: string; status: BotStatus }> {
+    return this.request(`/api/bots/${id}/behavior`, {
+      method: 'POST',
+      body: JSON.stringify({ behavior, enabled, options }),
+    });
+  }
+
+  async doAction(id: string, action: string, params?: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action, params }),
+    });
+  }
+
+  async stopAllBehaviors(id: string): Promise<{ success: boolean; status: BotStatus }> {
+    return this.request(`/api/bots/${id}/stop-all`, { method: 'POST' });
+  }
+
+  async getBehaviors(id: string): Promise<{ modes: Record<string, boolean>; behaviors: unknown }> {
+    return this.request(`/api/bots/${id}/behaviors`);
+  }
 }
 
 export const api = new ApiService();

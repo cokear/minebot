@@ -1,6 +1,7 @@
 import mineflayer from 'mineflayer';
 import pkg from 'mineflayer-pathfinder';
 const { pathfinder, Movements, goals } = pkg;
+import { BehaviorManager } from './behaviors/index.js';
 
 /**
  * Single bot instance for one server connection
@@ -14,6 +15,7 @@ export class BotInstance {
     this.onStatusChange = onStatusChange;
 
     this.bot = null;
+    this.behaviors = null;
     this.reconnecting = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
@@ -38,7 +40,10 @@ export class BotInstance {
     this.modes = {
       aiView: false,
       patrol: false,
-      autoChat: config.autoChat?.enabled || false
+      autoChat: config.autoChat?.enabled || false,
+      autoAttack: false,
+      follow: false,
+      mining: false
     };
 
     this.commands = {
@@ -47,7 +52,12 @@ export class BotInstance {
       '!ask': this.cmdAsk.bind(this),
       '!stop': this.cmdStop.bind(this),
       '!pos': this.cmdPosition.bind(this),
-      '!follow': this.cmdFollow.bind(this)
+      '!follow': this.cmdFollow.bind(this),
+      '!attack': this.cmdAttack.bind(this),
+      '!patrol': this.cmdPatrol.bind(this),
+      '!mine': this.cmdMine.bind(this),
+      '!jump': this.cmdJump.bind(this),
+      '!sneak': this.cmdSneak.bind(this)
     };
   }
 
@@ -81,7 +91,8 @@ export class BotInstance {
   getStatus() {
     return {
       ...this.status,
-      modes: this.modes
+      modes: this.modes,
+      behaviors: this.behaviors?.getStatus() || null
     };
   }
 
@@ -97,6 +108,12 @@ export class BotInstance {
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
+    }
+
+    // 停止所有行为
+    if (this.behaviors) {
+      this.behaviors.stopAll();
+      this.behaviors = null;
     }
 
     if (this.bot) {
@@ -222,6 +239,9 @@ export class BotInstance {
           } catch (e) {
             this.log('warning', '路径规划初始化失败', '⚠');
           }
+
+          // 初始化行为管理器
+          this.behaviors = new BehaviorManager(this.bot, goals);
 
           this.log('success', `进入世界 (版本: ${this.bot.version})`, '✓');
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
@@ -349,9 +369,20 @@ export class BotInstance {
 
   cmdHelp() {
     if (!this.bot) return;
-    ['!help - 帮助', '!come - 过来', '!follow - 跟随', '!stop - 停止', '!pos - 位置', '!ask [问题]'].forEach(
-      line => this.bot.chat(line)
-    );
+    const helpLines = [
+      '!help - 帮助',
+      '!come - 过来',
+      '!follow [玩家] - 跟随',
+      '!stop - 停止所有行为',
+      '!pos - 位置',
+      '!attack [hostile/all] - 自动攻击',
+      '!patrol - 随机巡逻',
+      '!mine - 自动挖矿',
+      '!jump - 跳跃',
+      '!sneak - 蹲下/站起',
+      '!ask [问题] - 问AI'
+    ];
+    helpLines.forEach(line => this.bot.chat(line));
   }
 
   async cmdCome(username) {
@@ -366,28 +397,104 @@ export class BotInstance {
     this.bot.chat(`正在走向 ${username}`);
   }
 
-  cmdFollow(username) {
-    if (!this.bot) return;
-    const player = this.bot.players[username];
-    if (!player?.entity) {
-      this.bot.chat('找不到你');
-      return;
+  cmdFollow(username, args) {
+    if (!this.bot || !this.behaviors) return;
+
+    const targetName = args[0] || username;
+
+    if (this.modes.follow) {
+      this.behaviors.follow.stop();
+      this.modes.follow = false;
+      this.bot.chat('停止跟随');
+    } else {
+      const result = this.behaviors.follow.start(targetName);
+      if (result.success) {
+        this.modes.follow = true;
+        this.bot.chat(result.message);
+      } else {
+        this.bot.chat(result.message);
+      }
     }
-    const goal = new goals.GoalFollow(player.entity, 2);
-    this.bot.pathfinder.setGoal(goal, true);
-    this.bot.chat(`跟随 ${username}`);
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
 
   cmdStop() {
     if (!this.bot) return;
+    if (this.behaviors) {
+      this.behaviors.stopAll();
+    }
     this.bot.pathfinder.stop();
-    this.bot.chat('已停止');
+    this.modes.follow = false;
+    this.modes.autoAttack = false;
+    this.modes.patrol = false;
+    this.modes.mining = false;
+    this.bot.chat('已停止所有行为');
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
 
   cmdPosition() {
     if (!this.bot) return;
     const pos = this.bot.entity.position;
     this.bot.chat(`X=${Math.floor(pos.x)} Y=${Math.floor(pos.y)} Z=${Math.floor(pos.z)}`);
+  }
+
+  cmdAttack(username, args) {
+    if (!this.bot || !this.behaviors) return;
+
+    if (this.modes.autoAttack) {
+      this.behaviors.attack.stop();
+      this.modes.autoAttack = false;
+      this.bot.chat('停止攻击');
+    } else {
+      const mode = args[0] || 'hostile';
+      const result = this.behaviors.attack.start(mode);
+      this.modes.autoAttack = true;
+      this.bot.chat(result.message);
+    }
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+  }
+
+  cmdPatrol() {
+    if (!this.bot || !this.behaviors) return;
+
+    if (this.modes.patrol) {
+      this.behaviors.patrol.stop();
+      this.modes.patrol = false;
+      this.bot.chat('停止巡逻');
+    } else {
+      const result = this.behaviors.patrol.start();
+      this.modes.patrol = true;
+      this.bot.chat(result.message);
+    }
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+  }
+
+  cmdMine() {
+    if (!this.bot || !this.behaviors) return;
+
+    if (this.modes.mining) {
+      this.behaviors.mining.stop();
+      this.modes.mining = false;
+      this.bot.chat('停止挖矿');
+    } else {
+      const result = this.behaviors.mining.start();
+      this.modes.mining = true;
+      this.bot.chat(result.message);
+    }
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+  }
+
+  cmdJump() {
+    if (!this.bot || !this.behaviors) return;
+    this.behaviors.action.jump();
+    this.bot.chat('跳!');
+  }
+
+  cmdSneak() {
+    if (!this.bot || !this.behaviors) return;
+    const sneaking = this.bot.getControlState('sneak');
+    this.behaviors.action.sneak(!sneaking);
+    this.bot.chat(sneaking ? '站起' : '蹲下');
   }
 
   async cmdAsk(username, args) {
@@ -401,6 +508,78 @@ export class BotInstance {
       }
     } catch (error) {
       this.bot.chat('AI 暂时不可用');
+    }
+  }
+
+  // 行为控制 API
+  setBehavior(behavior, enabled, options = {}) {
+    if (!this.behaviors) return { success: false, message: 'Bot 未连接' };
+
+    let result;
+    switch (behavior) {
+      case 'follow':
+        if (enabled) {
+          result = this.behaviors.follow.start(options.target);
+          this.modes.follow = result.success;
+        } else {
+          result = this.behaviors.follow.stop();
+          this.modes.follow = false;
+        }
+        break;
+      case 'attack':
+        if (enabled) {
+          result = this.behaviors.attack.start(options.mode || 'hostile');
+          this.modes.autoAttack = true;
+        } else {
+          result = this.behaviors.attack.stop();
+          this.modes.autoAttack = false;
+        }
+        break;
+      case 'patrol':
+        if (enabled) {
+          result = this.behaviors.patrol.start(options.waypoints);
+          this.modes.patrol = true;
+        } else {
+          result = this.behaviors.patrol.stop();
+          this.modes.patrol = false;
+        }
+        break;
+      case 'mining':
+        if (enabled) {
+          result = this.behaviors.mining.start(options.blocks);
+          this.modes.mining = true;
+        } else {
+          result = this.behaviors.mining.stop();
+          this.modes.mining = false;
+        }
+        break;
+      default:
+        result = { success: false, message: '未知行为' };
+    }
+
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    return result;
+  }
+
+  // 执行动作
+  doAction(action, params = {}) {
+    if (!this.behaviors) return { success: false, message: 'Bot 未连接' };
+
+    switch (action) {
+      case 'jump':
+        return this.behaviors.action.jump();
+      case 'sneak':
+        return this.behaviors.action.sneak(params.enabled);
+      case 'sprint':
+        return this.behaviors.action.sprint(params.enabled);
+      case 'useItem':
+        return this.behaviors.action.useItem();
+      case 'swing':
+        return this.behaviors.action.swing();
+      case 'lookAt':
+        return this.behaviors.action.lookAt(params.x, params.y, params.z);
+      default:
+        return { success: false, message: '未知动作' };
     }
   }
 }
