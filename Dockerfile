@@ -3,14 +3,18 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend-builder
 
-WORKDIR /app/frontend
+WORKDIR /app
 
-# Copy frontend package files
-COPY package*.json ./
+# Copy package files
+COPY package.json package-lock.json ./
+
+# Install dependencies
 RUN npm ci
 
-# Copy frontend source
-COPY . .
+# Copy source files (excluding server via .dockerignore)
+COPY index.html vite.config.ts tailwind.config.ts postcss.config.js tsconfig*.json ./
+COPY src/ ./src/
+COPY public/ ./public/
 
 # Build frontend
 RUN npm run build
@@ -20,15 +24,17 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install production dependencies for server
+# Copy server package.json and install dependencies
 COPY server/package.json ./server/
-RUN cd server && npm install --omit=dev
+WORKDIR /app/server
+RUN npm install --omit=dev
 
 # Copy server source
-COPY server/ ./server/
+COPY server/ ./
 
 # Copy built frontend from stage 1
-COPY --from=frontend-builder /app/frontend/dist ./dist/
+WORKDIR /app
+COPY --from=frontend-builder /app/dist ./dist/
 
 # Create data directory for config persistence
 RUN mkdir -p /app/server/data
@@ -40,9 +46,9 @@ ENV PORT=3000
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/status || exit 1
+# Health check - use /api/auth/check which doesn't require auth
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/check || exit 1
 
 # Start the server
 WORKDIR /app/server

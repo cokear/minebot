@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .env
+.env.local
 server/data/
+server/node_modules/
 *.log
 .DS_Store
+.git/
+.github/
+*.md
