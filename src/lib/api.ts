@@ -68,6 +68,29 @@ export interface Config {
   };
 }
 
+export interface RenewalConfig {
+  id: string;
+  name: string;
+  url: string;
+  method: 'GET' | 'POST';
+  headers: Record<string, string>;
+  body: string;
+  interval: number;
+  enabled: boolean;
+  lastRun: string | null;
+  lastResult: RenewalResult | null;
+  running?: boolean;
+}
+
+export interface RenewalResult {
+  success: boolean;
+  status?: number;
+  message: string;
+  response?: string;
+  error?: string;
+  timestamp: string;
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -276,6 +299,46 @@ class ApiService {
 
   async getBehaviors(id: string): Promise<{ modes: Record<string, boolean>; behaviors: unknown }> {
     return this.request(`/api/bots/${id}/behaviors`);
+  }
+
+  // ==================== 续期 API ====================
+
+  async getRenewals(): Promise<RenewalConfig[]> {
+    return this.request('/api/renewals');
+  }
+
+  async addRenewal(renewal: Partial<RenewalConfig>): Promise<{ success: boolean; renewal: RenewalConfig }> {
+    return this.request('/api/renewals', {
+      method: 'POST',
+      body: JSON.stringify(renewal),
+    });
+  }
+
+  async updateRenewal(id: string, updates: Partial<RenewalConfig>): Promise<{ success: boolean; renewal: RenewalConfig }> {
+    return this.request(`/api/renewals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async deleteRenewal(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/renewals/${id}`, { method: 'DELETE' });
+  }
+
+  async testRenewal(id: string): Promise<{ success: boolean; result: RenewalResult }> {
+    return this.request(`/api/renewals/${id}/test`, { method: 'POST' });
+  }
+
+  async startRenewal(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/renewals/${id}/start`, { method: 'POST' });
+  }
+
+  async stopRenewal(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/renewals/${id}/stop`, { method: 'POST' });
+  }
+
+  async getRenewalLogs(): Promise<LogEntry[]> {
+    return this.request('/api/renewals/logs');
   }
 }
 

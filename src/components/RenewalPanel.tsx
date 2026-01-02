@@ -1,0 +1,474 @@
+import { useState, useEffect } from "react";
+import {
+  RefreshCw,
+  Plus,
+  Trash2,
+  Play,
+  Square,
+  TestTube,
+  ChevronDown,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Settings2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { api, RenewalConfig } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+
+interface RenewalFormData {
+  name: string;
+  url: string;
+  method: "GET" | "POST";
+  headers: string;
+  body: string;
+  intervalHours: number;
+  intervalMinutes: number;
+}
+
+const defaultFormData: RenewalFormData = {
+  name: "",
+  url: "",
+  method: "GET",
+  headers: "",
+  body: "",
+  intervalHours: 6,
+  intervalMinutes: 0,
+};
+
+export function RenewalPanel() {
+  const [renewals, setRenewals] = useState<RenewalConfig[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<RenewalFormData>(defaultFormData);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const fetchRenewals = async () => {
+    try {
+      const data = await api.getRenewals();
+      setRenewals(data);
+    } catch (error) {
+      console.error("Failed to fetch renewals:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchRenewals();
+    const interval = setInterval(fetchRenewals, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!formData.url) {
+      toast({ title: "错误", description: "请输入续期URL", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Parse headers
+      let headers: Record<string, string> = {};
+      if (formData.headers.trim()) {
+        try {
+          headers = JSON.parse(formData.headers);
+        } catch {
+          // Try parsing as key: value format
+          formData.headers.split("\n").forEach(line => {
+            const [key, ...valueParts] = line.split(":");
+            if (key && valueParts.length > 0) {
+              headers[key.trim()] = valueParts.join(":").trim();
+            }
+          });
+        }
+      }
+
+      const interval = (formData.intervalHours * 60 + formData.intervalMinutes) * 60 * 1000;
+
+      const renewalData = {
+        name: formData.name || "未命名续期",
+        url: formData.url,
+        method: formData.method,
+        headers,
+        body: formData.body,
+        interval: interval || 21600000, // Default 6 hours
+        enabled: true,
+      };
+
+      if (editingId) {
+        await api.updateRenewal(editingId, renewalData);
+        toast({ title: "成功", description: "续期配置已更新" });
+      } else {
+        await api.addRenewal(renewalData);
+        toast({ title: "成功", description: "续期配置已添加" });
+      }
+
+      setDialogOpen(false);
+      setFormData(defaultFormData);
+      setEditingId(null);
+      fetchRenewals();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (renewal: RenewalConfig) => {
+    const hours = Math.floor(renewal.interval / 3600000);
+    const minutes = Math.floor((renewal.interval % 3600000) / 60000);
+
+    setFormData({
+      name: renewal.name,
+      url: renewal.url,
+      method: renewal.method,
+      headers: Object.keys(renewal.headers).length > 0
+        ? JSON.stringify(renewal.headers, null, 2)
+        : "",
+      body: renewal.body,
+      intervalHours: hours,
+      intervalMinutes: minutes,
+    });
+    setEditingId(renewal.id);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.deleteRenewal(id);
+      toast({ title: "成功", description: "续期配置已删除" });
+      fetchRenewals();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    }
+  };
+
+  const handleTest = async (id: string) => {
+    setTestingId(id);
+    try {
+      const result = await api.testRenewal(id);
+      if (result.result.success) {
+        toast({ title: "测试成功", description: result.result.message });
+      } else {
+        toast({ title: "测试失败", description: result.result.message, variant: "destructive" });
+      }
+      fetchRenewals();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setTestingId(null);
+    }
+  };
+
+  const handleToggle = async (id: string, enabled: boolean) => {
+    try {
+      if (enabled) {
+        await api.startRenewal(id);
+        toast({ title: "成功", description: "已启动续期" });
+      } else {
+        await api.stopRenewal(id);
+        toast({ title: "成功", description: "已停止续期" });
+      }
+      fetchRenewals();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    }
+  };
+
+  const formatInterval = (ms: number) => {
+    const hours = Math.floor(ms / 3600000);
+    const minutes = Math.floor((ms % 3600000) / 60000);
+    if (hours > 0 && minutes > 0) return `${hours}小时${minutes}分钟`;
+    if (hours > 0) return `${hours}小时`;
+    return `${minutes}分钟`;
+  };
+
+  const formatTime = (isoString: string | null) => {
+    if (!isoString) return "从未";
+    return new Date(isoString).toLocaleString("zh-CN");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              自动续期
+            </CardTitle>
+            <CardDescription>
+              自动续期翼龙面板等服务器托管商的服务
+            </CardDescription>
+          </div>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) {
+              setFormData(defaultFormData);
+              setEditingId(null);
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4 mr-1" />
+                添加续期
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
+                <DialogDescription>
+                  配置自动续期请求，保持服务器运行
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>名称</Label>
+                  <Input
+                    placeholder="我的服务器"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>续期 URL *</Label>
+                  <Input
+                    placeholder="https://panel.example.com/api/renew"
+                    value={formData.url}
+                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>请求方法</Label>
+                    <Select
+                      value={formData.method}
+                      onValueChange={(v) => setFormData({ ...formData, method: v as "GET" | "POST" })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="GET">GET</SelectItem>
+                        <SelectItem value="POST">POST</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>续期间隔</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="6"
+                        value={formData.intervalHours}
+                        onChange={(e) => setFormData({ ...formData, intervalHours: parseInt(e.target.value) || 0 })}
+                        className="w-20"
+                      />
+                      <span className="flex items-center text-sm text-muted-foreground">时</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="0"
+                        value={formData.intervalMinutes}
+                        onChange={(e) => setFormData({ ...formData, intervalMinutes: parseInt(e.target.value) || 0 })}
+                        className="w-20"
+                      />
+                      <span className="flex items-center text-sm text-muted-foreground">分</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>请求头 (JSON 或 Key: Value 格式)</Label>
+                  <Textarea
+                    placeholder={`{
+  "Cookie": "session=xxx",
+  "Authorization": "Bearer xxx"
+}`}
+                    value={formData.headers}
+                    onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
+                    rows={4}
+                    className="font-mono text-xs"
+                  />
+                </div>
+                {formData.method === "POST" && (
+                  <div className="space-y-2">
+                    <Label>请求体</Label>
+                    <Textarea
+                      placeholder='{"action": "renew"}'
+                      value={formData.body}
+                      onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                      rows={3}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  取消
+                </Button>
+                <Button onClick={handleSubmit} disabled={loading}>
+                  {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                  {editingId ? "保存" : "添加"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {renewals.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            暂无续期配置，点击上方按钮添加
+          </div>
+        ) : (
+          renewals.map((renewal) => (
+            <Collapsible
+              key={renewal.id}
+              open={expandedId === renewal.id}
+              onOpenChange={(open) => setExpandedId(open ? renewal.id : null)}
+            >
+              <div className="p-3 rounded-lg border bg-card">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        renewal.running ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                      }`}
+                    />
+                    <div>
+                      <div className="font-medium">{renewal.name}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {renewal.url}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={renewal.running ? "default" : "outline"}>
+                      {renewal.running ? "运行中" : "已停止"}
+                    </Badge>
+                    {renewal.lastResult && (
+                      <Badge variant={renewal.lastResult.success ? "secondary" : "destructive"}>
+                        {renewal.lastResult.success ? (
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                        ) : (
+                          <XCircle className="h-3 w-3 mr-1" />
+                        )}
+                        {renewal.lastResult.success ? "成功" : "失败"}
+                      </Badge>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleTest(renewal.id)}
+                      disabled={testingId === renewal.id}
+                      title="测试"
+                    >
+                      {testingId === renewal.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <TestTube className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleToggle(renewal.id, !renewal.running)}
+                      title={renewal.running ? "停止" : "启动"}
+                    >
+                      {renewal.running ? (
+                        <Square className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${
+                            expandedId === renewal.id ? "rotate-180" : ""
+                          }`}
+                        />
+                      </Button>
+                    </CollapsibleTrigger>
+                  </div>
+                </div>
+                <CollapsibleContent className="pt-3 space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-4 w-4" />
+                      间隔: {formatInterval(renewal.interval)}
+                    </div>
+                    <div className="text-muted-foreground">
+                      方法: {renewal.method}
+                    </div>
+                    <div className="col-span-2 text-muted-foreground">
+                      上次执行: {formatTime(renewal.lastRun)}
+                    </div>
+                    {renewal.lastResult?.response && (
+                      <div className="col-span-2">
+                        <div className="text-xs text-muted-foreground mb-1">响应:</div>
+                        <div className="p-2 bg-muted rounded text-xs font-mono max-h-24 overflow-auto">
+                          {renewal.lastResult.response}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(renewal)}
+                    >
+                      <Settings2 className="h-4 w-4 mr-1" />
+                      编辑
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(renewal.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      删除
+                    </Button>
+                  </div>
+                </CollapsibleContent>
+              </div>
+            </Collapsible>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}

@@ -11,6 +11,7 @@ import { BotManager } from './bot/BotPool.js';
 import { AIService } from './services/AIService.js';
 import { ConfigManager } from './services/ConfigManager.js';
 import { AuthService } from './services/AuthService.js';
+import { RenewalService } from './services/RenewalService.js';
 
 dotenv.config();
 
@@ -114,6 +115,9 @@ function broadcast(type, data) {
     }
   });
 }
+
+// Initialize renewal service (after broadcast is defined)
+const renewalService = new RenewalService(configManager, broadcast);
 
 // API Routes
 
@@ -408,6 +412,86 @@ app.get('/api/bots/:id/behaviors', (req, res) => {
       modes: bot.modes,
       behaviors: bot.behaviors?.getStatus() || null
     });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ==================== 续期 API ====================
+
+// 获取所有续期配置
+app.get('/api/renewals', (req, res) => {
+  try {
+    res.json(renewalService.getStatus());
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 添加续期配置
+app.post('/api/renewals', (req, res) => {
+  try {
+    const renewal = renewalService.addRenewal(req.body);
+    res.json({ success: true, renewal });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 更新续期配置
+app.put('/api/renewals/:id', (req, res) => {
+  try {
+    const renewal = renewalService.updateRenewal(req.params.id, req.body);
+    res.json({ success: true, renewal });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 删除续期配置
+app.delete('/api/renewals/:id', (req, res) => {
+  try {
+    const success = renewalService.removeRenewal(req.params.id);
+    res.json({ success });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 测试续期
+app.post('/api/renewals/:id/test', async (req, res) => {
+  try {
+    const result = await renewalService.testRenewal(req.params.id);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 启动续期
+app.post('/api/renewals/:id/start', (req, res) => {
+  try {
+    const success = renewalService.startRenewal(req.params.id);
+    res.json({ success });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 停止续期
+app.post('/api/renewals/:id/stop', (req, res) => {
+  try {
+    const success = renewalService.stopRenewal(req.params.id);
+    res.json({ success });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 获取续期日志
+app.get('/api/renewals/logs', (req, res) => {
+  try {
+    res.json(renewalService.getLogs());
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }

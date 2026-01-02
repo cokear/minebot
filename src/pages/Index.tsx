@@ -1,5 +1,6 @@
 import { Header } from "@/components/Header";
 import { MultiServerPanel } from "@/components/MultiServerPanel";
+import { RenewalPanel } from "@/components/RenewalPanel";
 import { ConsoleLog } from "@/components/ConsoleLog";
 import { useWebSocket } from "@/hooks/useBot";
 
@@ -15,6 +16,7 @@ const Index = () => {
           {/* Left Column - Server Management */}
           <div className="space-y-6">
             <MultiServerPanel />
+            <RenewalPanel />
           </div>
 
           {/* Right Column - Console */}
