@@ -4,70 +4,67 @@
 
 ## 功能特性
 
+- **登录认证**: JWT 认证保护，默认账号 `admin` / `admin123`
 - **机器人控制**: 通过 Web UI 连接和控制 Minecraft 机器人
 - **AI 对话**: 集成 OpenAI API，支持智能对话
 - **指令系统**: 支持 `!help`, `!come`, `!follow`, `!stop`, `!pos`, `!ask` 等指令
-- **模式切换**: AI 视角、巡逻模式、自动喊话
-- **定时器**: 支持定时重启
+- **统一设置**: 所有配置集中在设置页面管理
 - **实时日志**: WebSocket 实时推送日志
 
-## 快速开始 (Docker)
+## 快速开始
 
-### 前置要求
+### 方式一：使用预构建镜像（推荐）
 
-- Docker
-- Docker Compose
+创建 `docker-compose.yml` 文件：
 
-### 启动
+```yaml
+version: '3.8'
 
-**Windows:**
-```bash
-start.bat
+services:
+  minebot:
+    image: ghcr.io/debbide/minebot:latest
+    container_name: minebot
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - minebot-data:/app/server/data
+
+volumes:
+  minebot-data:
 ```
 
-**Linux/Mac:**
+启动：
+
 ```bash
-chmod +x start.sh
-./start.sh
+docker compose up -d
 ```
 
-**或手动执行:**
+访问 http://localhost:3000，使用 `admin` / `admin123` 登录。
+
+### 方式二：从源码构建
+
 ```bash
+git clone https://github.com/debbide/minebot.git
+cd minebot
 docker compose up -d --build
 ```
 
-### 访问
+## 配置说明
 
-打开浏览器访问: http://localhost:3000
+所有配置都可以在 Web 面板的 **设置页面** 中修改：
 
-## 配置
-
-### 环境变量
-
-复制 `.env.example` 为 `.env` 并配置:
-
-```env
-# OpenAI API 配置 (可选，也可以在 Web UI 中设置)
-OPENAI_API_KEY=sk-your-api-key
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_MODEL=gpt-3.5-turbo
-
-# 服务器端口
-PORT=3000
-```
-
-### Web UI 配置
-
-在控制面板中可以配置:
-
-1. **服务器连接**: Minecraft 服务器地址、端口、用户名
-2. **AI 配置**: API Key、Base URL、模型、系统提示词
-3. **模式控制**: AI 视角、巡逻、自动喊话
-4. **定时器**: 定时重启
+| 配置项 | 说明 |
+|--------|------|
+| 服务器 | Minecraft 服务器地址、端口、机器人用户名 |
+| AI | OpenAI API Key、Base URL、模型、系统提示词 |
+| 账号 | 面板登录用户名和密码 |
+| 自动喊话 | 开关、间隔时间、喊话内容 |
+| 自动续期 | 续期接口 URL、请求方式 |
 
 ## 游戏内指令
 
-在 Minecraft 游戏中对机器人发送消息:
+在 Minecraft 游戏中对机器人发送消息：
 
 | 指令 | 说明 |
 |------|------|
@@ -78,57 +75,41 @@ PORT=3000
 | `!pos` | 显示机器人位置 |
 | `!ask [问题]` | 向 AI 提问 |
 
-## 本地开发
+## 环境变量（可选）
 
-### 前端开发
+也可以通过环境变量预设配置：
 
-```bash
-npm install
-npm run dev
+```yaml
+services:
+  minebot:
+    image: ghcr.io/debbide/minebot:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - OPENAI_API_KEY=sk-your-key
+      - OPENAI_BASE_URL=https://api.openai.com/v1
+      - OPENAI_MODEL=gpt-3.5-turbo
+    volumes:
+      - minebot-data:/app/server/data
+
+volumes:
+  minebot-data:
 ```
 
-### 后端开发
+## 本地开发
 
 ```bash
-cd server
-npm install
-npm run dev
+# 前端
+npm install && npm run dev
+
+# 后端
+cd server && npm install && npm run dev
 ```
 
 ## 技术栈
 
-### 前端
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- Shadcn UI
-- TanStack Query
-
-### 后端
-- Node.js
-- Express
-- WebSocket
-- mineflayer
-- OpenAI API
-
-## 项目结构
-
-```
-minebot-assistant/
-├── src/                    # 前端源码
-│   ├── components/         # React 组件
-│   ├── hooks/              # 自定义 Hooks
-│   ├── lib/                # 工具函数和 API
-│   └── pages/              # 页面组件
-├── server/                 # 后端源码
-│   ├── bot/                # 机器人逻辑
-│   ├── services/           # 服务层
-│   └── data/               # 配置数据
-├── Dockerfile              # Docker 构建文件
-├── docker-compose.yml      # Docker Compose 配置
-└── start.sh / start.bat    # 启动脚本
-```
+- **前端**: React 18, TypeScript, Vite, Tailwind CSS, Shadcn UI
+- **后端**: Node.js, Express, WebSocket, mineflayer, OpenAI API
 
 ## License
 
