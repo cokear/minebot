@@ -23,8 +23,8 @@ export function Header() {
             <Bot className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">MC Bot Framework</h1>
-            <p className="text-xs text-muted-foreground">mineflayer + AI 通用框架</p>
+            <h1 className="text-lg font-bold tracking-tight">MC Bot</h1>
+            <p className="text-xs text-muted-foreground">Minecraft 挂机助手</p>
           </div>
         </div>
 

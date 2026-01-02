@@ -64,7 +64,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="border-t border-border py-6 mt-8">
         <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground sm:px-6 lg:px-8">
-          <p>MC Bot Framework — Minecraft 多服务器挂机助手</p>
+          <p>MC Bot — Minecraft 挂机助手</p>
         </div>
       </footer>
     </div>
