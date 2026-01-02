@@ -10,8 +10,7 @@ import {
   Save,
   Loader2,
   ArrowLeft,
-  LogOut,
-  Layers
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +20,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { MultiServerPanel } from "@/components/MultiServerPanel";
 
 interface SettingsData {
   server: {
@@ -161,15 +159,11 @@ export default function SettingsPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 py-6">
-        <Tabs defaultValue="servers" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="servers" className="text-xs sm:text-sm">
-              <Layers className="h-4 w-4 mr-1 hidden sm:inline" />
-              多服务器
-            </TabsTrigger>
+        <Tabs defaultValue="server" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="server" className="text-xs sm:text-sm">
               <Server className="h-4 w-4 mr-1 hidden sm:inline" />
-              默认
+              默认配置
             </TabsTrigger>
             <TabsTrigger value="ai" className="text-xs sm:text-sm">
               <Brain className="h-4 w-4 mr-1 hidden sm:inline" />
@@ -189,18 +183,16 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Multi-Server Management */}
-          <TabsContent value="servers">
-            <MultiServerPanel />
-          </TabsContent>
-
           {/* Server Settings */}
           <TabsContent value="server" className="space-y-4">
             <div className="rounded-lg border border-border bg-card p-6 space-y-4">
               <h2 className="font-semibold flex items-center gap-2">
                 <Server className="h-4 w-4 text-primary" />
-                Minecraft 服务器配置
+                新服务器默认配置
               </h2>
+              <p className="text-sm text-muted-foreground">
+                添加新服务器时使用的默认值
+              </p>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
