@@ -219,6 +219,41 @@ class ApiService {
   async getLogs(): Promise<LogEntry[]> {
     return this.request<LogEntry[]>('/api/logs');
   }
+
+  // Multi-Server Management
+  async getBots(): Promise<Record<string, BotStatus>> {
+    return this.request('/api/bots');
+  }
+
+  async addServer(server: {
+    id?: string;
+    name?: string;
+    host: string;
+    port?: number;
+    username?: string;
+    version?: string;
+  }): Promise<{ success: boolean; id: string; status: BotStatus }> {
+    return this.request('/api/bots/add', {
+      method: 'POST',
+      body: JSON.stringify(server),
+    });
+  }
+
+  async removeServer(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/bots/${id}`, { method: 'DELETE' });
+  }
+
+  async connectAll(): Promise<{ success: boolean; results: unknown[] }> {
+    return this.request('/api/bots/connect-all', { method: 'POST' });
+  }
+
+  async disconnectAll(): Promise<{ success: boolean }> {
+    return this.request('/api/bots/disconnect-all', { method: 'POST' });
+  }
+
+  async restartBot(id: string): Promise<{ success: boolean; status: BotStatus }> {
+    return this.request(`/api/bots/${id}/restart`, { method: 'POST' });
+  }
 }
 
 export const api = new ApiService();

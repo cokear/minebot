@@ -10,7 +10,8 @@ import {
   Save,
   Loader2,
   ArrowLeft,
-  LogOut
+  LogOut,
+  Layers
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { MultiServerPanel } from "@/components/MultiServerPanel";
 
 interface SettingsData {
   server: {
@@ -159,11 +161,15 @@ export default function SettingsPage() {
 
       {/* Content */}
       <main className="mx-auto max-w-4xl px-4 py-6">
-        <Tabs defaultValue="server" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs defaultValue="servers" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="servers" className="text-xs sm:text-sm">
+              <Layers className="h-4 w-4 mr-1 hidden sm:inline" />
+              多服务器
+            </TabsTrigger>
             <TabsTrigger value="server" className="text-xs sm:text-sm">
               <Server className="h-4 w-4 mr-1 hidden sm:inline" />
-              服务器
+              默认
             </TabsTrigger>
             <TabsTrigger value="ai" className="text-xs sm:text-sm">
               <Brain className="h-4 w-4 mr-1 hidden sm:inline" />
@@ -182,6 +188,11 @@ export default function SettingsPage() {
               续期
             </TabsTrigger>
           </TabsList>
+
+          {/* Multi-Server Management */}
+          <TabsContent value="servers">
+            <MultiServerPanel />
+          </TabsContent>
 
           {/* Server Settings */}
           <TabsContent value="server" className="space-y-4">
