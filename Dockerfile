@@ -21,8 +21,8 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # Install production dependencies for server
-COPY server/package*.json ./server/
-RUN cd server && npm ci --omit=dev
+COPY server/package.json ./server/
+RUN cd server && npm install --omit=dev
 
 # Copy server source
 COPY server/ ./server/
