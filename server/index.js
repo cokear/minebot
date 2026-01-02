@@ -294,7 +294,9 @@ app.get('/api/bots', (req, res) => {
 // Add new server
 app.post('/api/bots/add', async (req, res) => {
   try {
-    const result = await botManager.addServer(req.body);
+    // Save to config for persistence
+    const serverConfig = configManager.addServer(req.body);
+    const result = await botManager.addServer(serverConfig);
     res.json({ success: true, ...result });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -305,6 +307,8 @@ app.post('/api/bots/add', async (req, res) => {
 app.delete('/api/bots/:id', (req, res) => {
   try {
     const success = botManager.removeServer(req.params.id);
+    // Remove from config for persistence
+    configManager.removeServer(req.params.id);
     res.json({ success });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

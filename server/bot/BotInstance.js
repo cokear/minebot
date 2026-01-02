@@ -20,9 +20,11 @@ export class BotInstance {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
     this.connectionTimeout = null;
+    this.reconnectTimeout = null;
     this.activityMonitorInterval = null;
     this.autoChatInterval = null;
     this.lastActivity = Date.now();
+    this.destroyed = false;
 
     this.status = {
       id: this.id,
@@ -109,6 +111,10 @@ export class BotInstance {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
 
     // 停止所有行为
     if (this.behaviors) {
@@ -150,7 +156,7 @@ export class BotInstance {
   }
 
   scheduleReconnect() {
-    if (this.reconnecting) return;
+    if (this.reconnecting || this.destroyed) return;
 
     this.reconnecting = true;
     this.cleanup();
@@ -166,7 +172,8 @@ export class BotInstance {
 
     this.log('info', `等待 ${delay/1000} 秒后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
 
-    setTimeout(() => {
+    this.reconnectTimeout = setTimeout(() => {
+      if (this.destroyed) return;
       this.connect().catch(err => {
         this.log('error', `重连失败: ${err.message}`, '✗');
         this.reconnecting = false;
@@ -314,6 +321,7 @@ export class BotInstance {
   }
 
   disconnect() {
+    this.destroyed = true;
     this.reconnecting = true;
     this.cleanup();
     this.log('info', '已断开', '🔌');
