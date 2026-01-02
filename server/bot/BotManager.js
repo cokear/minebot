@@ -165,7 +165,10 @@ export class BotManager {
   }
 
   scheduleReconnect() {
-    if (this.reconnecting) return;
+    if (this.reconnecting) {
+      console.log('Already reconnecting, skip');
+      return;
+    }
 
     this.reconnecting = true;
     this.cleanup();
@@ -177,22 +180,30 @@ export class BotManager {
     }
 
     this.reconnectAttempts++;
-    // Exponential backoff: 10s, 20s, 40s, 60s max
-    const delay = Math.min(10000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
+    // Exponential backoff: 15s, 30s, 60s max
+    const delay = Math.min(15000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
 
     this.log('info', `等待 ${delay/1000} 秒后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
 
     setTimeout(() => {
-      this.reconnecting = false;
       if (this.lastConnectionOptions) {
         this.connect(this.lastConnectionOptions).catch(err => {
           this.log('error', `重连失败: ${err.message}`, '✗');
+          this.reconnecting = false;
         });
+      } else {
+        this.reconnecting = false;
       }
     }, delay);
   }
 
   async connect(options = {}) {
+    // Prevent multiple simultaneous connections
+    if (this.bot && this.status.connected) {
+      this.log('warning', '已有活动连接，请先断开', '⚠');
+      return;
+    }
+
     const config = this.configManager.getConfig();
     const host = options.host || config.server?.host || 'localhost';
     const port = options.port || config.server?.port || 25565;
@@ -202,10 +213,14 @@ export class BotManager {
     // Save connection options for reconnection
     this.lastConnectionOptions = { host, port, username, version };
 
-    // Clean up existing connection
-    if (this.bot) {
-      this.cleanup();
-    }
+    // Clean up existing connection first
+    this.cleanup();
+
+    // Wait a bit to ensure old connection is fully closed
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Reset reconnecting flag since we're starting a fresh connection
+    this.reconnecting = false;
 
     this.log('info', `正在连接服务器 ${host}:${port}...`, '⚡');
 
