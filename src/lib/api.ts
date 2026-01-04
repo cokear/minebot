@@ -77,6 +77,8 @@ export interface RenewalConfig {
   body: string;
   interval: number;
   enabled: boolean;
+  useProxy: boolean;
+  proxyUrl: string;
   lastRun: string | null;
   lastResult: RenewalResult | null;
   running?: boolean;

@@ -12,6 +12,7 @@ import {
   XCircle,
   Loader2,
   Settings2,
+  Cloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -51,6 +53,8 @@ interface RenewalFormData {
   body: string;
   intervalHours: number;
   intervalMinutes: number;
+  useProxy: boolean;
+  proxyUrl: string;
 }
 
 const defaultFormData: RenewalFormData = {
@@ -61,6 +65,8 @@ const defaultFormData: RenewalFormData = {
   body: "",
   intervalHours: 6,
   intervalMinutes: 0,
+  useProxy: false,
+  proxyUrl: "",
 };
 
 export function RenewalPanel() {
@@ -122,6 +128,8 @@ export function RenewalPanel() {
         body: formData.body,
         interval: interval || 21600000, // Default 6 hours
         enabled: true,
+        useProxy: formData.useProxy,
+        proxyUrl: formData.proxyUrl,
       };
 
       if (editingId) {
@@ -157,6 +165,8 @@ export function RenewalPanel() {
       body: renewal.body,
       intervalHours: hours,
       intervalMinutes: minutes,
+      useProxy: renewal.useProxy || false,
+      proxyUrl: renewal.proxyUrl || "",
     });
     setEditingId(renewal.id);
     setDialogOpen(true);
@@ -333,6 +343,36 @@ export function RenewalPanel() {
                     />
                   </div>
                 )}
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        <Cloud className="h-4 w-4" />
+                        CF Workers 代理
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        通过 Cloudflare Workers 中转请求
+                      </p>
+                    </div>
+                    <Switch
+                      checked={formData.useProxy}
+                      onCheckedChange={(checked) => setFormData({ ...formData, useProxy: checked })}
+                    />
+                  </div>
+                  {formData.useProxy && (
+                    <div className="space-y-2">
+                      <Label>代理 URL</Label>
+                      <Input
+                        placeholder="https://your-worker.workers.dev"
+                        value={formData.proxyUrl}
+                        onChange={(e) => setFormData({ ...formData, proxyUrl: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        请求将发送到此代理地址，由代理转发到目标 URL
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -433,6 +473,12 @@ export function RenewalPanel() {
                     <div className="text-muted-foreground">
                       方法: {renewal.method}
                     </div>
+                    {renewal.useProxy && (
+                      <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
+                        <Cloud className="h-4 w-4" />
+                        代理: {renewal.proxyUrl || "未配置"}
+                      </div>
+                    )}
                     <div className="col-span-2 text-muted-foreground">
                       上次执行: {formatTime(renewal.lastRun)}
                     </div>

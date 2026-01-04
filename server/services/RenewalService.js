@@ -84,6 +84,8 @@ export class RenewalService {
       body: renewalConfig.body || '',
       interval: renewalConfig.interval || 21600000, // 默认6小时
       enabled: renewalConfig.enabled !== false,
+      useProxy: renewalConfig.useProxy || false,
+      proxyUrl: renewalConfig.proxyUrl || '',
       lastRun: null,
       lastResult: null
     };
@@ -209,15 +211,30 @@ export class RenewalService {
       return { success: false, error: 'URL未配置' };
     }
 
-    this.log('info', `执行续期请求: ${renewal.method} ${renewal.url}`, id);
+    // 判断是否使用代理
+    const useProxy = renewal.useProxy && renewal.proxyUrl;
+    const targetUrl = useProxy ? renewal.proxyUrl : renewal.url;
+
+    this.log('info', `执行续期请求: ${renewal.method} ${renewal.url}${useProxy ? ' (通过CF代理)' : ''}`, id);
 
     try {
-      const options = {
-        method: renewal.method,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          ...renewal.headers
+      const requestHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ...renewal.headers
+      };
+
+      // 如果使用代理，添加代理所需的头信息
+      if (useProxy) {
+        requestHeaders['X-Target-URL'] = renewal.url;
+        requestHeaders['X-Target-Method'] = renewal.method;
+        if (renewal.headers) {
+          requestHeaders['X-Target-Headers'] = JSON.stringify(renewal.headers);
         }
+      }
+
+      const options = {
+        method: useProxy ? 'POST' : renewal.method,
+        headers: requestHeaders
       };
 
       if (renewal.method === 'POST' && renewal.body) {
@@ -227,7 +244,7 @@ export class RenewalService {
         }
       }
 
-      const response = await fetch(renewal.url, options);
+      const response = await fetch(targetUrl, options);
       const status = response.status;
       let responseText = '';
 
