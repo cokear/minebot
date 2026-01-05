@@ -1116,10 +1116,38 @@ export class RenewalService {
         clickCfWait++;
       }
 
-      // CF 验证通过后再等待一下
+      // CF 验证通过后，需要重新点击续期按钮
       if (clickCfWait > 0) {
-        this.log('info', 'Cloudflare 验证通过，等待页面加载...', id);
+        this.log('info', 'Cloudflare 验证通过，重新查找续期按钮...', id);
         await this.delay(3000);
+
+        // 重新查找续期按钮
+        let renewButtonAgain = null;
+        for (const selector of buttonSelectors) {
+          try {
+            const buttons = await page.$$(selector);
+            for (const btn of buttons) {
+              const text = await page.evaluate(el => el.textContent || el.value || '', btn);
+              for (const keyword of renewKeywords) {
+                if (text.includes(keyword)) {
+                  renewButtonAgain = btn;
+                  this.log('info', `重新找到续期按钮: ${text.trim().substring(0, 50)}`, id);
+                  break;
+                }
+              }
+              if (renewButtonAgain) break;
+            }
+            if (renewButtonAgain) break;
+          } catch (e) {}
+        }
+
+        if (renewButtonAgain) {
+          this.log('info', '再次点击续期按钮...', id);
+          await renewButtonAgain.click();
+          await this.delay(5000);
+        } else {
+          this.log('warning', 'CF验证后未找到续期按钮，可能已经续期成功', id);
+        }
       }
 
       // 检查是否有确认对话框
