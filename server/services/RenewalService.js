@@ -756,8 +756,19 @@ export class RenewalService {
       this.log('info', `导航到续期页面: ${targetUrl}`, id);
       await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-      // 等待页面加载
+      // 等待页面加载，检查 Cloudflare 5秒盾
       await this.delay(3000);
+      let renewPageContent = await page.content();
+      let cfWaitCount = 0;
+      while ((renewPageContent.includes('checking your browser') || renewPageContent.includes('Just a moment')) && cfWaitCount < 15) {
+        this.log('info', '等待续期页面 Cloudflare 验证...', id);
+        await this.delay(2000);
+        renewPageContent = await page.content();
+        cfWaitCount++;
+      }
+
+      // 再等待页面渲染完成
+      await this.delay(2000);
 
       // 查找续期按钮
       this.log('info', '查找续期按钮...', id);
@@ -823,8 +834,25 @@ export class RenewalService {
       this.log('info', '点击续期按钮...', id);
       await renewButton.click();
 
-      // 等待续期完成
-      await this.delay(3000);
+      // 等待续期请求完成，可能会有 CF 5秒盾
+      this.log('info', '等待续期请求完成...', id);
+      await this.delay(5000);
+
+      // 检查是否遇到 CF 验证
+      let afterClickContent = await page.content();
+      let clickCfWait = 0;
+      while ((afterClickContent.includes('checking your browser') || afterClickContent.includes('Just a moment')) && clickCfWait < 15) {
+        this.log('info', '续期请求遇到 Cloudflare 验证，等待中...', id);
+        await this.delay(2000);
+        afterClickContent = await page.content();
+        clickCfWait++;
+      }
+
+      // CF 验证通过后再等待一下
+      if (clickCfWait > 0) {
+        this.log('info', 'Cloudflare 验证通过，等待页面加载...', id);
+        await this.delay(3000);
+      }
 
       // 检查是否有确认对话框
       try {
@@ -836,26 +864,46 @@ export class RenewalService {
         if (confirmBtn) {
           this.log('info', '点击确认按钮...', id);
           await confirmBtn.click();
-          await this.delay(2000);
+          await this.delay(3000);
         }
       } catch (e) {}
 
+      // 等待操作完成
+      await this.delay(2000);
+
       // 检查结果
       const finalContent = await page.content();
+      const finalUrl = page.url();
+      this.log('info', `续期后页面: ${finalUrl}`, id);
+
       const success = finalContent.includes('success') ||
                      finalContent.includes('Success') ||
                      finalContent.includes('成功') ||
                      finalContent.includes('renewed') ||
-                     finalContent.includes('extended');
+                     finalContent.includes('Renewed') ||
+                     finalContent.includes('extended') ||
+                     finalContent.includes('Extended');
+
+      const hasError = finalContent.includes('error') ||
+                      finalContent.includes('Error') ||
+                      finalContent.includes('failed') ||
+                      finalContent.includes('Failed') ||
+                      finalContent.includes('失败');
 
       const result = {
-        success: true,
-        message: '浏览器点击续期完成',
-        response: success ? '检测到成功提示' : '已点击续期按钮',
+        success: !hasError,
+        message: success ? '续期成功' : (hasError ? '续期可能失败' : '已点击续期按钮'),
+        response: success ? '检测到成功提示' : (hasError ? '检测到错误提示' : '已执行点击操作'),
         timestamp: new Date().toISOString()
       };
 
-      this.log('success', '浏览器点击续期完成', id);
+      if (success) {
+        this.log('success', '续期成功', id);
+      } else if (hasError) {
+        this.log('error', '续期可能失败，检测到错误提示', id);
+      } else {
+        this.log('info', '已点击续期按钮，未检测到明确结果', id);
+      }
       return result;
 
     } catch (error) {
