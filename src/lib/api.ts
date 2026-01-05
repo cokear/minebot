@@ -312,6 +312,65 @@ class ApiService {
     return this.request(`/api/bots/${id}/behaviors`);
   }
 
+  // Bot-specific mode control
+  async setBotMode(id: string, mode: string, enabled: boolean): Promise<{ success: boolean; modes: Record<string, boolean>; status: BotStatus }> {
+    return this.request(`/api/bots/${id}/mode`, {
+      method: 'POST',
+      body: JSON.stringify({ mode, enabled }),
+    });
+  }
+
+  // Restart timer for specific bot
+  async setRestartTimer(id: string, minutes: number): Promise<{ success: boolean; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null } }> {
+    return this.request(`/api/bots/${id}/restart-timer`, {
+      method: 'POST',
+      body: JSON.stringify({ minutes }),
+    });
+  }
+
+  // Send /restart command immediately
+  async sendRestartCommand(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/restart-command`, {
+      method: 'POST',
+    });
+  }
+
+  // Auto-chat config for specific bot
+  async setAutoChat(id: string, config: { enabled?: boolean; interval?: number; messages?: string[] }): Promise<{ success: boolean; autoChat: { enabled: boolean; interval: number; messages: string[] }; status: BotStatus }> {
+    return this.request(`/api/bots/${id}/auto-chat`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  // Pterodactyl panel config
+  async setPterodactyl(id: string, config: { url: string; apiKey: string; serverId: string }): Promise<{ success: boolean; pterodactyl: { url: string; apiKey: string; serverId: string } }> {
+    return this.request(`/api/bots/${id}/pterodactyl`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  // Send console command via panel
+  async sendPanelCommand(id: string, command: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/panel-command`, {
+      method: 'POST',
+      body: JSON.stringify({ command }),
+    });
+  }
+
+  // Auto-OP bot
+  async autoOp(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/auto-op`, {
+      method: 'POST',
+    });
+  }
+
+  // Get bot config
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string } | null; autoOp: boolean } }> {
+    return this.request(`/api/bots/${id}/config`);
+  }
+
   // ==================== 续期 API ====================
 
   async getRenewals(): Promise<RenewalConfig[]> {

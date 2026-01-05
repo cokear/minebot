@@ -24,7 +24,24 @@ interface ServerConfig {
     autoAttack?: boolean;
     patrol?: boolean;
     mining?: boolean;
+    aiView?: boolean;
+    autoChat?: boolean;
   };
+  restartTimer?: {
+    enabled: boolean;
+    intervalMinutes: number;
+    nextRestart: string | null;
+  };
+  autoChat?: {
+    enabled: boolean;
+    interval: number;
+    messages: string[];
+  };
+  pterodactyl?: {
+    url: string;
+    apiKey: string;
+    serverId: string;
+  } | null;
 }
 
 export function MultiServerPanel() {
@@ -229,6 +246,9 @@ export function MultiServerPanel() {
                   connected={server.connected || false}
                   modes={server.modes}
                   players={server.players}
+                  restartTimer={server.restartTimer}
+                  autoChat={server.autoChat}
+                  pterodactyl={server.pterodactyl}
                   onUpdate={fetchServers}
                 />
               </div>

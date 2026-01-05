@@ -115,6 +115,7 @@ export class BotInstance {
     return {
       ...this.status,
       modes: this.modes,
+      autoChat: this.autoChatConfig,
       behaviors: this.behaviors?.getStatus() || null
     };
   }
