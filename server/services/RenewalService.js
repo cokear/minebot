@@ -732,12 +732,35 @@ export class RenewalService {
       await this.delay(100);
       await passwordInput.type(panelPassword, { delay: 30 });
 
-      // 提交登录
-      const submitBtn = await page.$('button[type="submit"]') || await page.$('form button');
-      if (submitBtn) {
-        await submitBtn.click();
-      } else {
+      // 查找并点击登录按钮
+      this.log('info', '查找登录按钮...', id);
+      const submitSelectors = [
+        'button[type="submit"]',
+        'button[data-localization-key="formButtonPrimary"]',
+        'input[type="submit"]',
+        '.cl-formButtonPrimary',
+        '.login-button',
+        '#login-button',
+        'form button'
+      ];
+
+      let submitted = false;
+      for (const selector of submitSelectors) {
+        try {
+          const submitBtn = await page.$(selector);
+          if (submitBtn) {
+            await submitBtn.click();
+            submitted = true;
+            this.log('info', `点击登录按钮: ${selector}`, id);
+            break;
+          }
+        } catch (e) {}
+      }
+
+      if (!submitted) {
+        // 尝试按回车提交
         await page.keyboard.press('Enter');
+        this.log('info', '尝试按回车提交', id);
       }
 
       this.log('info', '等待登录完成...', id);
@@ -747,9 +770,21 @@ export class RenewalService {
         await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
       } catch (e) {}
 
+      // 再等待确保登录完成
+      await this.delay(2000);
+
       // 检查登录是否成功
       const currentUrl = page.url();
       this.log('info', `登录后页面: ${currentUrl}`, id);
+
+      // 如果还在登录页，说明登录失败
+      if (currentUrl.includes('/auth/login') || currentUrl.includes('/login')) {
+        const pageText = await page.content();
+        if (pageText.includes('Invalid') || pageText.includes('incorrect') || pageText.includes('wrong')) {
+          throw new Error('登录失败：账号或密码错误');
+        }
+        this.log('warning', '登录后仍在登录页，尝试继续...', id);
+      }
 
       // 导航到续期页面
       const targetUrl = renewPageUrl || url;
