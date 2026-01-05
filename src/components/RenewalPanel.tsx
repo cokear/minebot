@@ -631,63 +631,64 @@ export function RenewalPanel() {
               onOpenChange={(open) => setExpandedId(open ? renewal.id : null)}
             >
               <div className="p-3 rounded-lg border bg-card">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
                         renewal.running ? "bg-green-500 animate-pulse" : "bg-gray-400"
                       }`}
                     />
-                    <div>
-                      <div className="font-medium">{renewal.name}</div>
-                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{renewal.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">
                         {renewal.url}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={renewal.running ? "default" : "outline"}>
-                      {renewal.running ? "运行中" : "已停止"}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Badge variant={renewal.running ? "default" : "outline"} className="text-xs px-1.5">
+                      {renewal.running ? "运行" : "停止"}
                     </Badge>
                     {renewal.lastResult && (
-                      <Badge variant={renewal.lastResult.success ? "secondary" : "destructive"}>
+                      <Badge variant={renewal.lastResult.success ? "secondary" : "destructive"} className="text-xs px-1.5">
                         {renewal.lastResult.success ? (
-                          <CheckCircle className="h-3 w-3 mr-1" />
+                          <CheckCircle className="h-3 w-3" />
                         ) : (
-                          <XCircle className="h-3 w-3 mr-1" />
+                          <XCircle className="h-3 w-3" />
                         )}
-                        {renewal.lastResult.success ? "成功" : "失败"}
                       </Badge>
                     )}
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7"
                       onClick={() => handleTest(renewal.id)}
                       disabled={testingId === renewal.id}
                       title="测试"
                     >
                       {testingId === renewal.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
-                        <TestTube className="h-4 w-4" />
+                        <TestTube className="h-3.5 w-3.5" />
                       )}
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-7 w-7"
                       onClick={() => handleToggle(renewal.id, !renewal.running)}
                       title={renewal.running ? "停止" : "启动"}
                     >
                       {renewal.running ? (
-                        <Square className="h-4 w-4" />
+                        <Square className="h-3.5 w-3.5" />
                       ) : (
-                        <Play className="h-4 w-4" />
+                        <Play className="h-3.5 w-3.5" />
                       )}
                     </Button>
                     <CollapsibleTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="h-7 w-7">
                         <ChevronDown
-                          className={`h-4 w-4 transition-transform ${
+                          className={`h-3.5 w-3.5 transition-transform ${
                             expandedId === renewal.id ? "rotate-180" : ""
                           }`}
                         />
