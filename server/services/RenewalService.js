@@ -528,33 +528,78 @@ export class RenewalService {
       }
 
       if (submitBtn) {
+        // 检查是否有 reCAPTCHA
+        const hasRecaptcha = await page.evaluate(() => {
+          return !!(
+            document.querySelector('.g-recaptcha') ||
+            document.querySelector('[data-sitekey]') ||
+            document.querySelector('iframe[src*="recaptcha"]') ||
+            window.grecaptcha
+          );
+        });
+
+        if (hasRecaptcha) {
+          this.log('info', '检测到 reCAPTCHA，等待验证...', id);
+          // 等待 reCAPTCHA v3 自动评分或 invisible reCAPTCHA 加载
+          await this.delay(3000);
+
+          // 尝试执行 reCAPTCHA（如果是 v3 或 invisible）
+          try {
+            await page.evaluate(() => {
+              if (window.grecaptcha && window.grecaptcha.execute) {
+                // 尝试获取 sitekey
+                const recaptchaEl = document.querySelector('[data-sitekey]');
+                if (recaptchaEl) {
+                  const sitekey = recaptchaEl.getAttribute('data-sitekey');
+                  window.grecaptcha.execute(sitekey);
+                } else {
+                  window.grecaptcha.execute();
+                }
+              }
+            });
+            this.log('info', '尝试执行 reCAPTCHA...', id);
+            await this.delay(3000);
+          } catch (e) {
+            // 忽略错误
+          }
+        }
+
         // 使用多种方式尝试提交表单
         this.log('info', '点击登录按钮', id);
 
         // 方式1: 直接点击按钮
         await submitBtn.click();
-        await this.delay(2000);
+        await this.delay(3000);
 
         // 检查是否还在登录页
         let currentLoginUrl = page.url();
         if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-          this.log('info', '尝试提交表单...', id);
-          // 方式2: 尝试提交表单
-          try {
-            await page.evaluate(() => {
-              const form = document.querySelector('form');
-              if (form) form.submit();
-            });
-          } catch (e) {
-            // 忽略，可能表单已提交
+          // 可能 reCAPTCHA 验证中，多等待一些
+          if (hasRecaptcha) {
+            this.log('info', '等待 reCAPTCHA 验证完成...', id);
+            await this.delay(5000);
+            currentLoginUrl = page.url();
           }
-          await this.delay(2000);
 
-          // 方式3: 使用键盘按回车
-          currentLoginUrl = page.url();
           if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-            this.log('info', '尝试按回车提交...', id);
-            await page.keyboard.press('Enter');
+            this.log('info', '尝试提交表单...', id);
+            // 方式2: 尝试提交表单
+            try {
+              await page.evaluate(() => {
+                const form = document.querySelector('form');
+                if (form) form.submit();
+              });
+            } catch (e) {
+              // 忽略，可能表单已提交
+            }
+            await this.delay(2000);
+
+            // 方式3: 使用键盘按回车
+            currentLoginUrl = page.url();
+            if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+              this.log('info', '尝试按回车提交...', id);
+              await page.keyboard.press('Enter');
+            }
           }
         }
       } else {
@@ -925,33 +970,78 @@ export class RenewalService {
       }
 
       if (submitBtn) {
+        // 检查是否有 reCAPTCHA
+        const hasRecaptcha = await page.evaluate(() => {
+          return !!(
+            document.querySelector('.g-recaptcha') ||
+            document.querySelector('[data-sitekey]') ||
+            document.querySelector('iframe[src*="recaptcha"]') ||
+            window.grecaptcha
+          );
+        });
+
+        if (hasRecaptcha) {
+          this.log('info', '检测到 reCAPTCHA，等待验证...', id);
+          // 等待 reCAPTCHA v3 自动评分或 invisible reCAPTCHA 加载
+          await this.delay(3000);
+
+          // 尝试执行 reCAPTCHA（如果是 v3 或 invisible）
+          try {
+            await page.evaluate(() => {
+              if (window.grecaptcha && window.grecaptcha.execute) {
+                // 尝试获取 sitekey
+                const recaptchaEl = document.querySelector('[data-sitekey]');
+                if (recaptchaEl) {
+                  const sitekey = recaptchaEl.getAttribute('data-sitekey');
+                  window.grecaptcha.execute(sitekey);
+                } else {
+                  window.grecaptcha.execute();
+                }
+              }
+            });
+            this.log('info', '尝试执行 reCAPTCHA...', id);
+            await this.delay(3000);
+          } catch (e) {
+            // 忽略错误
+          }
+        }
+
         // 使用多种方式尝试提交表单
         this.log('info', '点击登录按钮', id);
 
         // 方式1: 直接点击按钮
         await submitBtn.click();
-        await this.delay(2000);
+        await this.delay(3000);
 
         // 检查是否还在登录页
         let currentLoginUrl = page.url();
         if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-          this.log('info', '尝试提交表单...', id);
-          // 方式2: 尝试提交表单
-          try {
-            await page.evaluate(() => {
-              const form = document.querySelector('form');
-              if (form) form.submit();
-            });
-          } catch (e) {
-            // 忽略，可能表单已提交
+          // 可能 reCAPTCHA 验证中，多等待一些
+          if (hasRecaptcha) {
+            this.log('info', '等待 reCAPTCHA 验证完成...', id);
+            await this.delay(5000);
+            currentLoginUrl = page.url();
           }
-          await this.delay(2000);
 
-          // 方式3: 使用键盘按回车
-          currentLoginUrl = page.url();
           if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-            this.log('info', '尝试按回车提交...', id);
-            await page.keyboard.press('Enter');
+            this.log('info', '尝试提交表单...', id);
+            // 方式2: 尝试提交表单
+            try {
+              await page.evaluate(() => {
+                const form = document.querySelector('form');
+                if (form) form.submit();
+              });
+            } catch (e) {
+              // 忽略，可能表单已提交
+            }
+            await this.delay(2000);
+
+            // 方式3: 使用键盘按回车
+            currentLoginUrl = page.url();
+            if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+              this.log('info', '尝试按回车提交...', id);
+              await page.keyboard.press('Enter');
+            }
           }
         }
       } else {
