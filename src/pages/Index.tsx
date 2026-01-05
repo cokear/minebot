@@ -13,15 +13,15 @@ const Index = () => {
       <Header />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Top Section - Two Columns */}
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Left Column - Server Management */}
           <div className="space-y-6">
             <MultiServerPanel />
             <QuickControlPanel />
-            <RenewalPanel />
           </div>
 
-          {/* Right Column - Console */}
+          {/* Right Column - Renewal & Status */}
           <div className="space-y-6">
             {/* Status Summary */}
             <div className="rounded-lg border border-border bg-card p-4">
@@ -55,9 +55,14 @@ const Index = () => {
               )}
             </div>
 
-            {/* Console Log */}
-            <ConsoleLog />
+            {/* Renewal Panel */}
+            <RenewalPanel />
           </div>
+        </div>
+
+        {/* Bottom Section - Console Log (Full Width) */}
+        <div className="mt-6">
+          <ConsoleLog />
         </div>
       </main>
 
