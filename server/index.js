@@ -536,6 +536,56 @@ app.post('/api/bots/:id/auto-op', async (req, res) => {
   }
 });
 
+// Update auto-chat config for a specific bot
+app.post('/api/bots/:id/auto-chat', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { enabled, interval, messages } = req.body;
+    const config = {};
+    if (enabled !== undefined) config.enabled = enabled;
+    if (interval !== undefined) config.interval = interval;
+    if (messages !== undefined) config.messages = messages;
+
+    const result = bot.updateAutoChatConfig(config);
+
+    // 同步更新模式状态
+    if (enabled !== undefined) {
+      bot.setMode('autoChat', enabled);
+    }
+
+    res.json({ success: true, autoChat: result, status: bot.getStatus() });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Get full config for a specific bot
+app.get('/api/bots/:id/config', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    res.json({
+      success: true,
+      config: {
+        id: bot.id,
+        name: bot.status.serverName,
+        modes: bot.modes,
+        autoChat: bot.autoChatConfig,
+        restartTimer: bot.status.restartTimer,
+        pterodactyl: bot.status.pterodactyl,
+        autoOp: bot.status.autoOp
+      }
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // ==================== 续期 API ====================
 
 // 获取所有续期配置

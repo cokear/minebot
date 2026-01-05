@@ -8,12 +8,13 @@ import axios from 'axios';
  * Single bot instance for one server connection
  */
 export class BotInstance {
-  constructor(id, config, aiService, onLog, onStatusChange) {
+  constructor(id, config, aiService, onLog, onStatusChange, configManager = null) {
     this.id = id;
     this.config = config;
     this.aiService = aiService;
     this.onLog = onLog;
     this.onStatusChange = onStatusChange;
+    this.configManager = configManager; // 用于保存配置
 
     this.bot = null;
     this.behaviors = null;
@@ -41,22 +42,31 @@ export class BotInstance {
       position: null,
       players: [],
       username: '',
-      restartTimer: {
+      restartTimer: config.restartTimer || {
         enabled: false,
         intervalMinutes: 0,
-        nextRestart: null
+        nextRestart: null,
+        command: '/restart'
       },
       pterodactyl: config.pterodactyl || null, // 翼龙面板配置
       autoOp: config.autoOp !== false // 默认启用自动OP
     };
 
-    this.modes = {
+    // 从配置加载模式设置
+    this.modes = config.modes || {
       aiView: false,
       patrol: false,
       autoChat: config.autoChat?.enabled || false,
       autoAttack: false,
       follow: false,
       mining: false
+    };
+
+    // 自动喊话配置
+    this.autoChatConfig = config.autoChat || {
+      enabled: false,
+      interval: 60000,
+      messages: ['Hello!']
     };
 
     this.commands = {
@@ -361,8 +371,8 @@ export class BotInstance {
       clearInterval(this.autoChatInterval);
     }
 
-    const messages = this.config.autoChat?.messages || ['Hello!'];
-    const interval = this.config.autoChat?.interval || 60000;
+    const messages = this.autoChatConfig.messages || ['Hello!'];
+    const interval = this.autoChatConfig.interval || 60000;
 
     this.autoChatInterval = setInterval(() => {
       if (this.bot && this.modes.autoChat) {
@@ -371,6 +381,46 @@ export class BotInstance {
         this.log('chat', `[自动] ${msg}`, '📢');
       }
     }, interval);
+  }
+
+  /**
+   * 更新自动喊话配置
+   */
+  updateAutoChatConfig(config) {
+    this.autoChatConfig = {
+      ...this.autoChatConfig,
+      ...config
+    };
+    // 如果正在运行，重启以应用新配置
+    if (this.modes.autoChat) {
+      this.startAutoChat();
+    }
+    this.saveConfig();
+    return this.autoChatConfig;
+  }
+
+  /**
+   * 保存配置到 ConfigManager
+   */
+  saveConfig() {
+    if (!this.configManager) return;
+
+    try {
+      this.configManager.updateServer(this.id, {
+        modes: this.modes,
+        autoChat: this.autoChatConfig,
+        restartTimer: {
+          enabled: this.status.restartTimer?.enabled || false,
+          intervalMinutes: this.status.restartTimer?.intervalMinutes || 0,
+          command: this.status.restartTimer?.command || '/restart'
+        },
+        pterodactyl: this.status.pterodactyl || {},
+        autoOp: this.status.autoOp
+      });
+      this.log('info', '配置已保存', '💾');
+    } catch (error) {
+      this.log('warning', `保存配置失败: ${error.message}`, '⚠');
+    }
   }
 
   setMode(mode, enabled) {
@@ -408,6 +458,8 @@ export class BotInstance {
           this.log('info', '巡逻模式已关闭', '🚶');
         }
       }
+      // 保存模式设置到配置
+      this.saveConfig();
       if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     }
   }
@@ -454,6 +506,8 @@ export class BotInstance {
     }
 
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    // 保存配置
+    this.saveConfig();
     return this.status.restartTimer;
   }
 
@@ -522,6 +576,8 @@ export class BotInstance {
     };
     this.log('info', '翼龙面板配置已更新', '🔑');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    // 保存配置
+    this.saveConfig();
     return this.status.pterodactyl;
   }
 

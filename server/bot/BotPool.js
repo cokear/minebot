@@ -32,7 +32,8 @@ export class BotPool {
           serverConfig,
           this.aiService,
           this.onLog.bind(this),
-          this.onStatusChange.bind(this)
+          this.onStatusChange.bind(this),
+          this.configManager // 传递 configManager 以支持保存配置
         );
         this.bots.set(serverConfig.id, bot);
         console.log(`已加载服务器: ${serverConfig.name || serverConfig.id}`);
@@ -150,7 +151,8 @@ export class BotPool {
       serverConfig,
       this.aiService,
       this.onLog.bind(this),
-      this.onStatusChange.bind(this)
+      this.onStatusChange.bind(this),
+      this.configManager // 传递 configManager 以支持保存配置
     );
 
     this.bots.set(id, bot);

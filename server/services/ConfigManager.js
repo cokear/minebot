@@ -201,20 +201,63 @@ export class ConfigManager {
       throw new Error(`Server ${serverConfig.id} already exists`);
     }
 
-    this.config.servers.push(serverConfig);
+    // 确保每个服务器有完整的独立配置
+    const fullConfig = {
+      id: serverConfig.id,
+      name: serverConfig.name || `Server ${serverConfig.id}`,
+      host: serverConfig.host || 'localhost',
+      port: serverConfig.port || 25565,
+      username: serverConfig.username || '',
+      version: serverConfig.version || false,
+      // 独立的模式设置
+      modes: serverConfig.modes || {
+        aiView: false,
+        patrol: false,
+        autoChat: false
+      },
+      // 独立的自动喊话配置
+      autoChat: serverConfig.autoChat || {
+        enabled: false,
+        interval: 60000,
+        messages: ['Hello!', '有人吗?']
+      },
+      // 独立的定时重启配置
+      restartTimer: serverConfig.restartTimer || {
+        enabled: false,
+        intervalMinutes: 0,
+        command: '/restart'
+      },
+      // 独立的翼龙面板配置
+      pterodactyl: serverConfig.pterodactyl || {
+        url: '',
+        apiKey: '',
+        serverId: ''
+      },
+      // 是否自动OP
+      autoOp: serverConfig.autoOp !== false
+    };
+
+    this.config.servers.push(fullConfig);
     this.saveConfig();
-    return serverConfig;
+    return fullConfig;
   }
 
   updateServer(id, updates) {
     const index = this.config.servers?.findIndex(s => s.id === id);
-    if (index === -1) {
+    if (index === -1 || index === undefined) {
       throw new Error(`Server ${id} not found`);
     }
 
+    // 深度合并更新
+    const current = this.config.servers[index];
     this.config.servers[index] = {
-      ...this.config.servers[index],
-      ...updates
+      ...current,
+      ...updates,
+      // 确保嵌套对象也被正确合并
+      modes: { ...current.modes, ...(updates.modes || {}) },
+      autoChat: { ...current.autoChat, ...(updates.autoChat || {}) },
+      restartTimer: { ...current.restartTimer, ...(updates.restartTimer || {}) },
+      pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) }
     };
     this.saveConfig();
     return this.config.servers[index];
