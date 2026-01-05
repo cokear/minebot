@@ -1096,14 +1096,7 @@ export class RenewalService {
       // ========== 续期部分 ==========
 
       // 导航到续期页面
-      let targetUrl = renewPageUrl || url;
-
-      // 对于 zampto.net，自动添加 renew=true 参数
-      if (targetUrl.includes('zampto.net') && !targetUrl.includes('renew=')) {
-        const separator = targetUrl.includes('?') ? '&' : '?';
-        targetUrl = `${targetUrl}${separator}renew=true`;
-        this.log('info', '检测到 zampto.net，自动添加 renew=true 参数', id);
-      }
+      const targetUrl = renewPageUrl || url;
 
       this.log('info', `导航到续期页面: ${targetUrl}`, id);
       await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
@@ -1400,14 +1393,8 @@ export class RenewalService {
     // 判断是否使用代理
     const useProxy = renewal.useProxy && renewal.proxyUrl;
 
-    // 构建续期 URL（对于 zampto.net 自动添加 renew=true）
-    let renewUrl = renewal.renewPageUrl || renewal.url;
-    if (renewUrl.includes('zampto.net') && !renewUrl.includes('renew=')) {
-      const separator = renewUrl.includes('?') ? '&' : '?';
-      renewUrl = `${renewUrl}${separator}renew=true`;
-      this.log('info', '检测到 zampto.net，自动添加 renew=true 参数', id);
-    }
-
+    // 构建续期 URL
+    const renewUrl = renewal.renewPageUrl || renewal.url;
     const targetUrl = useProxy ? renewal.proxyUrl : renewUrl;
 
     // 如果启用自动登录，尝试使用缓存的 Cookie
