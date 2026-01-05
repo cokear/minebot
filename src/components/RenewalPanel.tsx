@@ -15,6 +15,7 @@ import {
   Cloud,
   Key,
   User,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,14 @@ import {
 } from "@/components/ui/dialog";
 import { api, RenewalConfig } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+
+interface RenewalLog {
+  id: number;
+  timestamp: string;
+  type: 'info' | 'success' | 'error';
+  message: string;
+  renewalId?: string;
+}
 
 interface RenewalFormData {
   name: string;
@@ -88,6 +97,8 @@ export function RenewalPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<RenewalFormData>(defaultFormData);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [logs, setLogs] = useState<RenewalLog[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
   const { toast } = useToast();
 
   const fetchRenewals = async () => {
@@ -99,11 +110,29 @@ export function RenewalPanel() {
     }
   };
 
+  const fetchLogs = async () => {
+    try {
+      const data = await api.getRenewalLogs();
+      setLogs(data as RenewalLog[]);
+    } catch (error) {
+      console.error("Failed to fetch logs:", error);
+    }
+  };
+
   useEffect(() => {
     fetchRenewals();
     const interval = setInterval(fetchRenewals, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // 当显示日志或测试时，更频繁地获取日志
+  useEffect(() => {
+    if (showLogs || testingId) {
+      fetchLogs();
+      const interval = setInterval(fetchLogs, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [showLogs, testingId]);
 
   const handleSubmit = async () => {
     if (!formData.url) {
@@ -259,7 +288,16 @@ export function RenewalPanel() {
               自动续期翼龙面板等服务器托管商的服务
             </CardDescription>
           </div>
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={showLogs ? "default" : "outline"}
+              onClick={() => setShowLogs(!showLogs)}
+            >
+              <ScrollText className="h-4 w-4 mr-1" />
+              日志
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) {
               setFormData(defaultFormData);
@@ -461,9 +499,49 @@ export function RenewalPanel() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* 日志面板 */}
+        {showLogs && (
+          <div className="p-3 rounded-lg border bg-muted/50 mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium flex items-center gap-2">
+                <ScrollText className="h-4 w-4" />
+                运行日志
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setLogs([])}
+              >
+                清空
+              </Button>
+            </div>
+            <div className="h-48 overflow-y-auto space-y-1 font-mono text-xs">
+              {logs.length === 0 ? (
+                <div className="text-muted-foreground text-center py-4">
+                  暂无日志
+                </div>
+              ) : (
+                logs.slice().reverse().map((log) => (
+                  <div
+                    key={log.id}
+                    className={`flex gap-2 ${
+                      log.type === 'error' ? 'text-red-500' :
+                      log.type === 'success' ? 'text-green-500' :
+                      'text-muted-foreground'
+                    }`}
+                  >
+                    <span className="text-muted-foreground">[{log.timestamp}]</span>
+                    <span>{log.message}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
         {renewals.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             暂无续期配置，点击上方按钮添加
