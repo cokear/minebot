@@ -533,11 +533,11 @@ export class RenewalService {
 
         // 方式1: 直接点击按钮
         await submitBtn.click();
-        await this.delay(1000);
+        await this.delay(2000);
 
         // 检查是否还在登录页
-        const urlAfterClick = page.url();
-        if (urlAfterClick.includes('/auth/login') || urlAfterClick.includes('/login')) {
+        let currentLoginUrl = page.url();
+        if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
           this.log('info', '尝试提交表单...', id);
           // 方式2: 尝试提交表单
           try {
@@ -548,13 +548,13 @@ export class RenewalService {
           } catch (e) {
             // 忽略，可能表单已提交
           }
-          await this.delay(1000);
+          await this.delay(2000);
 
-          // 方式3: 在密码框按回车
-          const urlAfterSubmit = page.url();
-          if (urlAfterSubmit.includes('/auth/login') || urlAfterSubmit.includes('/login')) {
-            this.log('info', '尝试在密码框按回车...', id);
-            await passwordInput.press('Enter');
+          // 方式3: 使用键盘按回车
+          currentLoginUrl = page.url();
+          if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+            this.log('info', '尝试按回车提交...', id);
+            await page.keyboard.press('Enter');
           }
         }
       } else {
@@ -930,11 +930,11 @@ export class RenewalService {
 
         // 方式1: 直接点击按钮
         await submitBtn.click();
-        await this.delay(1000);
+        await this.delay(2000);
 
         // 检查是否还在登录页
-        const urlAfterClick = page.url();
-        if (urlAfterClick.includes('/auth/login') || urlAfterClick.includes('/login')) {
+        let currentLoginUrl = page.url();
+        if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
           this.log('info', '尝试提交表单...', id);
           // 方式2: 尝试提交表单
           try {
@@ -945,13 +945,13 @@ export class RenewalService {
           } catch (e) {
             // 忽略，可能表单已提交
           }
-          await this.delay(1000);
+          await this.delay(2000);
 
-          // 方式3: 在密码框按回车
-          const urlAfterSubmit = page.url();
-          if (urlAfterSubmit.includes('/auth/login') || urlAfterSubmit.includes('/login')) {
-            this.log('info', '尝试在密码框按回车...', id);
-            await passwordInput.press('Enter');
+          // 方式3: 使用键盘按回车
+          currentLoginUrl = page.url();
+          if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+            this.log('info', '尝试按回车提交...', id);
+            await page.keyboard.press('Enter');
           }
         }
       } else {
