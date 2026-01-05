@@ -416,18 +416,13 @@ export class RenewalService {
         throw new Error('找不到登录表单');
       }
 
-      // 清空并填写表单 - 使用 React 兼容的方式
+      // 清空并填写表单 - 使用键盘输入方式确保 React 状态更新
       this.log('info', `填写登录信息... 用户名: ${panelUsername}`, id);
 
-      // 使用 evaluate 来设置值并触发事件，兼容 React 控制组件
-      await page.evaluate((el, value) => {
-        // 设置原生值
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(el, value);
-        // 触发 input 事件
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }, usernameInput, panelUsername);
+      // 先清空输入框，然后使用键盘输入
+      await usernameInput.click({ clickCount: 3 }); // 选中所有文字
+      await this.delay(100);
+      await usernameInput.type(panelUsername, { delay: 50 });
       await this.delay(300);
 
       // 如果是多步登录（有用户名输入但没有密码输入），需要先点击 Continue
@@ -500,15 +495,12 @@ export class RenewalService {
         }
       }
 
-      // 填写密码 - 使用 React 兼容的方式
+      // 填写密码 - 使用键盘输入方式确保 React 状态更新
       this.log('info', '填写密码...', id);
       await this.delay(300);
-      await page.evaluate((el, value) => {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(el, value);
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }, passwordInput, panelPassword);
+      await passwordInput.click({ clickCount: 3 }); // 选中所有文字
+      await this.delay(100);
+      await passwordInput.type(panelPassword, { delay: 50 });
       await this.delay(500);
 
       // 查找并点击登录按钮
@@ -536,9 +528,35 @@ export class RenewalService {
       }
 
       if (submitBtn) {
-        // 使用 evaluate 点击，更可靠
-        await page.evaluate(btn => btn.click(), submitBtn);
+        // 使用多种方式尝试提交表单
         this.log('info', '点击登录按钮', id);
+
+        // 方式1: 直接点击按钮
+        await submitBtn.click();
+        await this.delay(1000);
+
+        // 检查是否还在登录页
+        const urlAfterClick = page.url();
+        if (urlAfterClick.includes('/auth/login') || urlAfterClick.includes('/login')) {
+          this.log('info', '尝试提交表单...', id);
+          // 方式2: 尝试提交表单
+          try {
+            await page.evaluate(() => {
+              const form = document.querySelector('form');
+              if (form) form.submit();
+            });
+          } catch (e) {
+            // 忽略，可能表单已提交
+          }
+          await this.delay(1000);
+
+          // 方式3: 在密码框按回车
+          const urlAfterSubmit = page.url();
+          if (urlAfterSubmit.includes('/auth/login') || urlAfterSubmit.includes('/login')) {
+            this.log('info', '尝试在密码框按回车...', id);
+            await passwordInput.press('Enter');
+          }
+        }
       } else {
         // 尝试按回车提交
         this.log('info', '未找到登录按钮，尝试按回车提交', id);
@@ -795,18 +813,13 @@ export class RenewalService {
         throw new Error('找不到登录表单');
       }
 
-      // 清空并填写表单 - 使用 React 兼容的方式
+      // 清空并填写表单 - 使用键盘输入方式确保 React 状态更新
       this.log('info', `填写登录信息... 用户名: ${panelUsername}`, id);
 
-      // 使用 evaluate 来设置值并触发事件，兼容 React 控制组件
-      await page.evaluate((el, value) => {
-        // 设置原生值
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(el, value);
-        // 触发 input 事件
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }, usernameInput, panelUsername);
+      // 先清空输入框，然后使用键盘输入
+      await usernameInput.click({ clickCount: 3 }); // 选中所有文字
+      await this.delay(100);
+      await usernameInput.type(panelUsername, { delay: 50 });
       await this.delay(300);
 
       // 如果是多步登录（有用户名输入但没有密码输入），需要先点击 Continue
@@ -879,15 +892,12 @@ export class RenewalService {
         }
       }
 
-      // 填写密码 - 使用 React 兼容的方式
+      // 填写密码 - 使用键盘输入方式确保 React 状态更新
       this.log('info', '填写密码...', id);
       await this.delay(300);
-      await page.evaluate((el, value) => {
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-        nativeInputValueSetter.call(el, value);
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }, passwordInput, panelPassword);
+      await passwordInput.click({ clickCount: 3 }); // 选中所有文字
+      await this.delay(100);
+      await passwordInput.type(panelPassword, { delay: 50 });
       await this.delay(500);
 
       // 查找并点击登录按钮
@@ -915,9 +925,35 @@ export class RenewalService {
       }
 
       if (submitBtn) {
-        // 使用 evaluate 点击，更可靠
-        await page.evaluate(btn => btn.click(), submitBtn);
+        // 使用多种方式尝试提交表单
         this.log('info', '点击登录按钮', id);
+
+        // 方式1: 直接点击按钮
+        await submitBtn.click();
+        await this.delay(1000);
+
+        // 检查是否还在登录页
+        const urlAfterClick = page.url();
+        if (urlAfterClick.includes('/auth/login') || urlAfterClick.includes('/login')) {
+          this.log('info', '尝试提交表单...', id);
+          // 方式2: 尝试提交表单
+          try {
+            await page.evaluate(() => {
+              const form = document.querySelector('form');
+              if (form) form.submit();
+            });
+          } catch (e) {
+            // 忽略，可能表单已提交
+          }
+          await this.delay(1000);
+
+          // 方式3: 在密码框按回车
+          const urlAfterSubmit = page.url();
+          if (urlAfterSubmit.includes('/auth/login') || urlAfterSubmit.includes('/login')) {
+            this.log('info', '尝试在密码框按回车...', id);
+            await passwordInput.press('Enter');
+          }
+        }
       } else {
         // 尝试按回车提交
         this.log('info', '未找到登录按钮，尝试按回车提交', id);
