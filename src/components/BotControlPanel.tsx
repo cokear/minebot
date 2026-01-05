@@ -274,203 +274,204 @@ export function BotControlPanel({
   if (!connected) return null;
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" size="sm" className="w-full justify-between mt-2">
-          <span className="text-xs">行为控制</span>
-          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+    <div className="space-y-2 mt-2">
+      {/* 快捷操作栏 - 始终可见 */}
+      <div className="flex gap-2 flex-wrap">
+        <Button
+          size="sm"
+          variant={modes.aiView ? "default" : "outline"}
+          onClick={() => handleModeToggle("aiView", !modes.aiView)}
+          disabled={loading !== null}
+          title="AI视角 - 自动看向附近玩家"
+        >
+          {loading === "aiView" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
+          <span className="text-xs">AI视角</span>
         </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent className="space-y-3 pt-3">
-        {/* 活动状态 */}
-        <div className="flex flex-wrap gap-1">
-          {modes.follow && <Badge variant="secondary">跟随中</Badge>}
-          {modes.autoAttack && <Badge variant="destructive">攻击中</Badge>}
-          {modes.patrol && <Badge variant="secondary">巡逻中</Badge>}
-          {modes.mining && <Badge variant="secondary">挖矿中</Badge>}
-          {modes.aiView && <Badge variant="secondary">AI视角</Badge>}
-          {modes.autoChat && <Badge variant="secondary">自动喊话</Badge>}
-          {restartTimer?.enabled && (
-            <Badge variant="outline">
-              定时重启: {restartTimer.intervalMinutes}分钟
-            </Badge>
-          )}
-        </div>
+        <Button
+          size="sm"
+          variant={modes.autoChat ? "default" : "outline"}
+          onClick={() => handleModeToggle("autoChat", !modes.autoChat)}
+          disabled={loading !== null}
+          title="自动喊话"
+        >
+          {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1" />}
+          <span className="text-xs">喊话</span>
+        </Button>
+        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline" title="服务器设置">
+              <Settings className="h-4 w-4 mr-1" />
+              <span className="text-xs">设置</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>服务器设置</DialogTitle>
+              <DialogDescription>配置此服务器的独立设置</DialogDescription>
+            </DialogHeader>
+            <Tabs defaultValue="restart" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="restart">定时重启</TabsTrigger>
+                <TabsTrigger value="chat">自动喊话</TabsTrigger>
+                <TabsTrigger value="panel">翼龙面板</TabsTrigger>
+              </TabsList>
 
-        {/* 模式开关 */}
-        <div className="grid grid-cols-3 gap-2">
-          <Button
-            size="sm"
-            variant={modes.aiView ? "default" : "outline"}
-            onClick={() => handleModeToggle("aiView", !modes.aiView)}
-            disabled={loading !== null}
-            title="AI视角 - 自动看向附近玩家"
-          >
-            {loading === "aiView" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
-            <span className="text-xs">AI视角</span>
-          </Button>
-          <Button
-            size="sm"
-            variant={modes.autoChat ? "default" : "outline"}
-            onClick={() => handleModeToggle("autoChat", !modes.autoChat)}
-            disabled={loading !== null}
-            title="自动喊话"
-          >
-            {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1" />}
-            <span className="text-xs">喊话</span>
-          </Button>
-          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" title="服务器设置">
-                <Settings className="h-4 w-4 mr-1" />
-                <span className="text-xs">设置</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>服务器设置</DialogTitle>
-                <DialogDescription>配置此服务器的独立设置</DialogDescription>
-              </DialogHeader>
-              <Tabs defaultValue="restart" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="restart">定时重启</TabsTrigger>
-                  <TabsTrigger value="chat">自动喊话</TabsTrigger>
-                  <TabsTrigger value="panel">翼龙面板</TabsTrigger>
-                </TabsList>
-
-                {/* 定时重启设置 */}
-                <TabsContent value="restart" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>重启间隔 (分钟)</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        value={restartMinutes}
-                        onChange={(e) => setRestartMinutes(e.target.value)}
-                        placeholder="0 = 禁用"
-                        min="0"
-                      />
-                      <Button
-                        onClick={handleSaveRestartTimer}
-                        disabled={loading === "restartTimer"}
-                      >
-                        {loading === "restartTimer" ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存"}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      设置后机器人会定时发送 /restart 命令。设为 0 禁用。
-                    </p>
-                  </div>
+              {/* 定时重启设置 */}
+              <TabsContent value="restart" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>重启间隔 (分钟)</Label>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={handleRestartNow}
-                      disabled={loading === "restartNow"}
-                      className="flex-1"
-                    >
-                      {loading === "restartNow" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
-                      立即发送 /restart
-                    </Button>
-                  </div>
-                  {restartTimer?.nextRestart && (
-                    <p className="text-xs text-muted-foreground">
-                      下次重启: {new Date(restartTimer.nextRestart).toLocaleString()}
-                    </p>
-                  )}
-                </TabsContent>
-
-                {/* 自动喊话设置 */}
-                <TabsContent value="chat" className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label>启用自动喊话</Label>
-                    <Switch
-                      checked={autoChatEnabled}
-                      onCheckedChange={setAutoChatEnabled}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>间隔 (秒)</Label>
                     <Input
                       type="number"
-                      value={autoChatInterval}
-                      onChange={(e) => setAutoChatInterval(e.target.value)}
-                      placeholder="60"
-                      min="10"
+                      value={restartMinutes}
+                      onChange={(e) => setRestartMinutes(e.target.value)}
+                      placeholder="0 = 禁用"
+                      min="0"
                     />
+                    <Button
+                      onClick={handleSaveRestartTimer}
+                      disabled={loading === "restartTimer"}
+                    >
+                      {loading === "restartTimer" ? <Loader2 className="h-4 w-4 animate-spin" /> : "保存"}
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label>消息列表 (每行一条)</Label>
-                    <Textarea
-                      value={autoChatMessages}
-                      onChange={(e) => setAutoChatMessages(e.target.value)}
-                      placeholder="欢迎来到服务器！&#10;有问题可以问我&#10;需要帮助请输入 !help"
-                      rows={4}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSaveAutoChat}
-                    disabled={loading === "autoChat"}
-                    className="w-full"
-                  >
-                    {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                    保存自动喊话设置
-                  </Button>
-                </TabsContent>
-
-                {/* 翼龙面板设置 */}
-                <TabsContent value="panel" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>面板地址</Label>
-                    <Input
-                      value={panelUrl}
-                      onChange={(e) => setPanelUrl(e.target.value)}
-                      placeholder="https://panel.example.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <Input
-                      type="password"
-                      value={panelApiKey}
-                      onChange={(e) => setPanelApiKey(e.target.value)}
-                      placeholder="ptlc_..."
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>服务器 ID</Label>
-                    <Input
-                      value={panelServerId}
-                      onChange={(e) => setPanelServerId(e.target.value)}
-                      placeholder="abc12345"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSavePterodactyl}
-                    disabled={loading === "pterodactyl"}
-                    className="w-full"
-                  >
-                    {loading === "pterodactyl" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                    保存面板配置
-                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    设置后机器人会定时发送 /restart 命令。设为 0 禁用。
+                  </p>
+                </div>
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    onClick={handleAutoOp}
-                    disabled={loading === "autoOp" || !panelUrl}
-                    className="w-full"
+                    onClick={handleRestartNow}
+                    disabled={loading === "restartNow"}
+                    className="flex-1"
                   >
-                    {loading === "autoOp" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Crown className="h-4 w-4 mr-1" />}
-                    给机器人 OP 权限
+                    {loading === "restartNow" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
+                    立即发送 /restart
                   </Button>
+                </div>
+                {restartTimer?.nextRestart && (
                   <p className="text-xs text-muted-foreground">
-                    配置翼龙面板后，可以通过面板控制台发送命令，包括自动给机器人 OP 权限。
+                    下次重启: {new Date(restartTimer.nextRestart).toLocaleString()}
                   </p>
-                </TabsContent>
-              </Tabs>
-            </DialogContent>
-          </Dialog>
-        </div>
+                )}
+              </TabsContent>
 
-        {/* 跟随控制 */}
+              {/* 自动喊话设置 */}
+              <TabsContent value="chat" className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label>启用自动喊话</Label>
+                  <Switch
+                    checked={autoChatEnabled}
+                    onCheckedChange={setAutoChatEnabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>间隔 (秒)</Label>
+                  <Input
+                    type="number"
+                    value={autoChatInterval}
+                    onChange={(e) => setAutoChatInterval(e.target.value)}
+                    placeholder="60"
+                    min="10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>消息列表 (每行一条)</Label>
+                  <Textarea
+                    value={autoChatMessages}
+                    onChange={(e) => setAutoChatMessages(e.target.value)}
+                    placeholder="欢迎来到服务器！&#10;有问题可以问我&#10;需要帮助请输入 !help"
+                    rows={4}
+                  />
+                </div>
+                <Button
+                  onClick={handleSaveAutoChat}
+                  disabled={loading === "autoChat"}
+                  className="w-full"
+                >
+                  {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  保存自动喊话设置
+                </Button>
+              </TabsContent>
+
+              {/* 翼龙面板设置 */}
+              <TabsContent value="panel" className="space-y-4">
+                <div className="space-y-2">
+                  <Label>面板地址</Label>
+                  <Input
+                    value={panelUrl}
+                    onChange={(e) => setPanelUrl(e.target.value)}
+                    placeholder="https://panel.example.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>API Key</Label>
+                  <Input
+                    type="password"
+                    value={panelApiKey}
+                    onChange={(e) => setPanelApiKey(e.target.value)}
+                    placeholder="ptlc_..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>服务器 ID</Label>
+                  <Input
+                    value={panelServerId}
+                    onChange={(e) => setPanelServerId(e.target.value)}
+                    placeholder="abc12345"
+                  />
+                </div>
+                <Button
+                  onClick={handleSavePterodactyl}
+                  disabled={loading === "pterodactyl"}
+                  className="w-full"
+                >
+                  {loading === "pterodactyl" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  保存面板配置
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleAutoOp}
+                  disabled={loading === "autoOp" || !panelUrl}
+                  className="w-full"
+                >
+                  {loading === "autoOp" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Crown className="h-4 w-4 mr-1" />}
+                  给机器人 OP 权限
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  配置翼龙面板后，可以通过面板控制台发送命令，包括自动给机器人 OP 权限。
+                </p>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* 状态徽章 */}
+      <div className="flex flex-wrap gap-1">
+        {modes.follow && <Badge variant="secondary">跟随中</Badge>}
+        {modes.autoAttack && <Badge variant="destructive">攻击中</Badge>}
+        {modes.patrol && <Badge variant="secondary">巡逻中</Badge>}
+        {modes.mining && <Badge variant="secondary">挖矿中</Badge>}
+        {modes.aiView && <Badge variant="secondary">AI视角</Badge>}
+        {modes.autoChat && <Badge variant="secondary">自动喊话</Badge>}
+        {restartTimer?.enabled && (
+          <Badge variant="outline">
+            定时重启: {restartTimer.intervalMinutes}分钟
+          </Badge>
+        )}
+      </div>
+
+      {/* 行为控制折叠面板 */}
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-between">
+            <span className="text-xs">更多控制</span>
+            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 pt-3">
         <div className="flex gap-2">
           <Select value={followTarget} onValueChange={setFollowTarget}>
             <SelectTrigger className="flex-1 h-8 text-xs">
@@ -554,5 +555,6 @@ export function BotControlPanel({
         </div>
       </CollapsibleContent>
     </Collapsible>
+    </div>
   );
 }
