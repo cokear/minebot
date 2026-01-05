@@ -623,8 +623,23 @@ export class RenewalService {
       // 再等待一下确保 cookie 设置完成
       await this.delay(2000);
 
+      // 如果登录后还在 auth 域名，需要先导航到目标面板域名获取 cookies
+      let currentUrl = page.url();
+      if (currentUrl.includes('auth.') || currentUrl.includes('/sign-in')) {
+        // 尝试从续期 URL 提取目标域名
+        const renewUrl = new URL(renewal.url || renewal.renewPageUrl);
+        const dashboardUrl = `${renewUrl.protocol}//${renewUrl.host}`;
+        this.log('info', `登录后导航到目标面板: ${dashboardUrl}`, id);
+        try {
+          await page.goto(dashboardUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+          await this.delay(3000);
+          currentUrl = page.url();
+        } catch (e) {
+          this.log('warning', `导航到面板失败: ${e.message}`, id);
+        }
+      }
+
       // 检查是否登录成功（页面是否还在登录页）
-      const currentUrl = page.url();
       const currentContent = await page.content();
 
       // 检查是否还在登录页
@@ -652,8 +667,28 @@ export class RenewalService {
         this.log('warning', '登录后仍在登录页面，可能需要验证或登录失败', id);
       }
 
-      // 获取 Cookies
-      const cookies = await page.cookies();
+      // 获取 Cookies - 包括所有相关域名
+      // 先获取当前页面的 cookies
+      let cookies = await page.cookies();
+
+      // 尝试获取续期目标 URL 域名的 cookies
+      try {
+        const targetUrl = renewal.url || renewal.renewPageUrl;
+        if (targetUrl) {
+          const targetCookies = await page.cookies(targetUrl);
+          // 合并 cookies，避免重复
+          const existingNames = new Set(cookies.map(c => `${c.name}@${c.domain}`));
+          for (const cookie of targetCookies) {
+            const key = `${cookie.name}@${cookie.domain}`;
+            if (!existingNames.has(key)) {
+              cookies.push(cookie);
+              existingNames.add(key);
+            }
+          }
+        }
+      } catch (e) {
+        // 忽略获取额外 cookies 的错误
+      }
 
       if (cookies.length === 0) {
         throw new Error('登录后未获取到 Cookie');
@@ -664,7 +699,16 @@ export class RenewalService {
       const hasXsrfToken = cookies.some(c => c.name === 'XSRF-TOKEN');
       const hasCfClearance = cookies.some(c => c.name === 'cf_clearance');
 
-      this.log('info', `获取到 ${cookies.length} 个 Cookie (session: ${hasPterodactylSession}, xsrf: ${hasXsrfToken}, cf: ${hasCfClearance})`, id);
+      // 额外检查 zampto 特定的 session cookie
+      const hasAnySession = cookies.some(c => c.name.toLowerCase().includes('session'));
+
+      this.log('info', `获取到 ${cookies.length} 个 Cookie (session: ${hasPterodactylSession || hasAnySession}, xsrf: ${hasXsrfToken}, cf: ${hasCfClearance})`, id);
+
+      // 如果没有找到关键 session cookie，打印所有 cookie 名称用于调试
+      if (!hasPterodactylSession && !hasAnySession && !hasXsrfToken) {
+        const cookieNames = cookies.map(c => `${c.name}(${c.domain})`).join(', ');
+        this.log('warning', `Cookie 列表: ${cookieNames}`, id);
+      }
 
       // 缓存 cookies
       this.cookies.set(id, cookies);

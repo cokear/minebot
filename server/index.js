@@ -12,6 +12,7 @@ import { AIService } from './services/AIService.js';
 import { ConfigManager } from './services/ConfigManager.js';
 import { AuthService } from './services/AuthService.js';
 import { RenewalService } from './services/RenewalService.js';
+import { SystemService } from './services/SystemService.js';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use(express.json());
 const configManager = new ConfigManager();
 const authService = new AuthService(configManager);
 const aiService = new AIService(configManager);
+const systemService = new SystemService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 
 // Auth routes (before auth middleware)
@@ -134,6 +136,15 @@ function broadcast(type, data) {
 const renewalService = new RenewalService(configManager, broadcast);
 
 // API Routes
+
+// System status (memory monitoring)
+app.get('/api/system/status', (req, res) => {
+  res.json(systemService.getStatus());
+});
+
+app.get('/api/system/memory', (req, res) => {
+  res.json(systemService.getMemoryStatus());
+});
 
 // Get bot status
 app.get('/api/status', (req, res) => {
@@ -433,6 +444,50 @@ app.get('/api/bots/:id/behaviors', (req, res) => {
       modes: bot.modes,
       behaviors: bot.behaviors?.getStatus() || null
     });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Set restart timer for a specific bot (send /restart command)
+app.post('/api/bots/:id/restart-timer', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { minutes } = req.body;
+    const result = bot.setRestartTimer(minutes || 0);
+    res.json({ success: true, restartTimer: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Send /restart command immediately
+app.post('/api/bots/:id/restart-command', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = bot.sendRestartCommand();
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Toggle mode for a specific bot
+app.post('/api/bots/:id/mode', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { mode, enabled } = req.body;
+    bot.setMode(mode, enabled);
+    res.json({ success: true, modes: bot.modes, status: bot.getStatus() });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }

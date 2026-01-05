@@ -164,11 +164,20 @@ export class PatrolBehavior {
     this.waypoints = [];
     this.currentIndex = 0;
     this.interval = null;
-    this.radius = 20; // 随机巡逻半径
+    this.radius = 12; // 随机巡逻半径
+    this.centerPos = null; // 巡逻中心点
+    this.isMoving = false;
+    this.patrolTimeout = null;
   }
 
   start(waypoints = null) {
     this.active = true;
+    this.isMoving = false;
+
+    // 记录当前位置作为中心点（如果没有设置的话）
+    if (!this.centerPos && this.bot?.entity) {
+      this.centerPos = this.bot.entity.position.clone();
+    }
 
     if (waypoints && waypoints.length > 0) {
       // 使用指定路径点
@@ -177,10 +186,54 @@ export class PatrolBehavior {
       this.patrolWaypoints();
     } else {
       // 随机巡逻
-      this.patrolRandom();
+      this.startRandomPatrol();
     }
 
     return { success: true, message: '开始巡逻' };
+  }
+
+  startRandomPatrol() {
+    if (!this.active || !this.bot) return;
+
+    // 监听到达目标事件
+    this.bot.on('goal_reached', this.onGoalReached.bind(this));
+
+    // 开始第一次巡逻
+    this.doRandomMove();
+  }
+
+  onGoalReached() {
+    if (!this.active) return;
+    this.isMoving = false;
+
+    // 随机等待后继续巡逻
+    const waitTime = 3000 + Math.random() * 5000;
+    this.patrolTimeout = setTimeout(() => {
+      if (this.active) {
+        this.doRandomMove();
+      }
+    }, waitTime);
+  }
+
+  doRandomMove() {
+    if (!this.active || !this.bot?.entity || this.isMoving) return;
+
+    // 以中心点为基准随机移动
+    const center = this.centerPos || this.bot.entity.position;
+    const offsetX = (Math.random() - 0.5) * this.radius * 2;
+    const offsetZ = (Math.random() - 0.5) * this.radius * 2;
+
+    const targetX = center.x + offsetX;
+    const targetZ = center.z + offsetZ;
+
+    try {
+      const goal = new this.goals.GoalNear(targetX, center.y, targetZ, 1);
+      this.bot.pathfinder.setGoal(goal);
+      this.isMoving = true;
+    } catch (e) {
+      // 忽略路径规划错误
+      this.isMoving = false;
+    }
   }
 
   patrolWaypoints() {
@@ -198,22 +251,6 @@ export class PatrolBehavior {
     });
   }
 
-  patrolRandom() {
-    if (!this.active || !this.bot) return;
-
-    const pos = this.bot.entity.position;
-    const x = pos.x + (Math.random() - 0.5) * this.radius * 2;
-    const z = pos.z + (Math.random() - 0.5) * this.radius * 2;
-
-    const goal = new this.goals.GoalNear(x, pos.y, z, 2);
-    this.bot.pathfinder.setGoal(goal);
-
-    // 移动完成后继续随机巡逻
-    setTimeout(() => {
-      if (this.active) this.patrolRandom();
-    }, 10000 + Math.random() * 5000);
-  }
-
   addWaypoint(x, y, z) {
     this.waypoints.push({ x, y, z });
     return { success: true, message: `添加路径点 (${x}, ${y}, ${z})` };
@@ -227,6 +264,19 @@ export class PatrolBehavior {
 
   stop() {
     this.active = false;
+    this.isMoving = false;
+
+    // 清除定时器
+    if (this.patrolTimeout) {
+      clearTimeout(this.patrolTimeout);
+      this.patrolTimeout = null;
+    }
+
+    // 移除事件监听
+    if (this.bot) {
+      this.bot.removeListener('goal_reached', this.onGoalReached);
+    }
+
     if (this.bot?.pathfinder) {
       this.bot.pathfinder.stop();
     }
@@ -238,7 +288,13 @@ export class PatrolBehavior {
       active: this.active,
       waypoints: this.waypoints.length,
       currentIndex: this.currentIndex,
-      radius: this.radius
+      radius: this.radius,
+      isMoving: this.isMoving,
+      centerPos: this.centerPos ? {
+        x: Math.round(this.centerPos.x),
+        y: Math.round(this.centerPos.y),
+        z: Math.round(this.centerPos.z)
+      } : null
     };
   }
 }
@@ -332,6 +388,72 @@ export class MiningBehavior {
       active: this.active,
       targetBlocks: this.targetBlocks,
       range: this.range
+    };
+  }
+}
+
+/**
+ * AI 视角行为 - 自动看向附近玩家
+ */
+export class AiViewBehavior {
+  constructor(bot) {
+    this.bot = bot;
+    this.active = false;
+    this.interval = null;
+    this.range = 16; // 检测范围
+    this.lastTarget = null;
+  }
+
+  start() {
+    if (this.active) return { success: false, message: 'AI 视角已在运行' };
+
+    this.active = true;
+
+    this.interval = setInterval(() => {
+      if (!this.active || !this.bot?.entity) {
+        return;
+      }
+
+      // 查找最近的玩家
+      const target = this.bot.nearestEntity(entity => {
+        if (!entity || entity === this.bot.entity) return false;
+        if (entity.type !== 'player') return false;
+        const dist = this.bot.entity.position.distanceTo(entity.position);
+        return dist <= this.range;
+      });
+
+      if (target) {
+        try {
+          // 看向玩家头部位置
+          const eyePos = target.position.offset(0, target.height * 0.85, 0);
+          this.bot.lookAt(eyePos);
+          this.lastTarget = target.username || target.name || 'unknown';
+        } catch (e) {
+          // 忽略错误
+        }
+      } else {
+        this.lastTarget = null;
+      }
+    }, 500); // 每 500ms 更新一次视角
+
+    return { success: true, message: 'AI 视角已开启' };
+  }
+
+  stop() {
+    this.active = false;
+    this.lastTarget = null;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+    return { success: true, message: 'AI 视角已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      range: this.range,
+      lastTarget: this.lastTarget
     };
   }
 }
@@ -472,6 +594,7 @@ export class BehaviorManager {
     this.patrol = new PatrolBehavior(bot, goals);
     this.mining = new MiningBehavior(bot);
     this.action = new ActionBehavior(bot);
+    this.aiView = new AiViewBehavior(bot);
   }
 
   stopAll() {
@@ -480,6 +603,7 @@ export class BehaviorManager {
     this.patrol.stop();
     this.mining.stop();
     this.action.stopLoop();
+    this.aiView.stop();
     return { success: true, message: '已停止所有行为' };
   }
 
@@ -489,7 +613,8 @@ export class BehaviorManager {
       attack: this.attack.getStatus(),
       patrol: this.patrol.getStatus(),
       mining: this.mining.getStatus(),
-      action: this.action.getStatus()
+      action: this.action.getStatus(),
+      aiView: this.aiView.getStatus()
     };
   }
 }

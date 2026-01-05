@@ -23,8 +23,10 @@ export class BotInstance {
     this.reconnectTimeout = null;
     this.activityMonitorInterval = null;
     this.autoChatInterval = null;
+    this.restartCommandTimer = null; // 定时发送 /restart 命令
     this.lastActivity = Date.now();
     this.destroyed = false;
+    this.spawnPosition = null; // 记录出生点用于巡逻
 
     this.status = {
       id: this.id,
@@ -36,7 +38,12 @@ export class BotInstance {
       food: 0,
       position: null,
       players: [],
-      username: ''
+      username: '',
+      restartTimer: {
+        enabled: false,
+        intervalMinutes: 0,
+        nextRestart: null
+      }
     };
 
     this.modes = {
@@ -114,6 +121,10 @@ export class BotInstance {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
+    }
+    if (this.restartCommandTimer) {
+      clearInterval(this.restartCommandTimer);
+      this.restartCommandTimer = null;
     }
 
     // 停止所有行为
@@ -240,8 +251,14 @@ export class BotInstance {
           this.status.serverAddress = `${host}:${port}`;
           this.status.version = this.bot.version;
 
+          // 记录出生点用于巡逻
+          if (this.bot.entity) {
+            this.spawnPosition = this.bot.entity.position.clone();
+          }
+
           try {
             const movements = new Movements(this.bot, this.bot.registry);
+            movements.canDig = false; // 禁止挖掘方块
             this.bot.pathfinder.setMovements(movements);
           } catch (e) {
             this.log('warning', '路径规划初始化失败', '⚠');
@@ -357,8 +374,89 @@ export class BotInstance {
           this.autoChatInterval = null;
         }
       }
+      // AI 视角模式
+      if (mode === 'aiView' && this.behaviors) {
+        if (enabled) {
+          this.behaviors.aiView.start();
+          this.log('info', 'AI 视角已开启', '👁️');
+        } else {
+          this.behaviors.aiView.stop();
+          this.log('info', 'AI 视角已关闭', '👁️');
+        }
+      }
+      // 巡逻模式
+      if (mode === 'patrol' && this.behaviors) {
+        if (enabled) {
+          // 使用出生点作为巡逻中心
+          if (this.spawnPosition) {
+            this.behaviors.patrol.centerPos = this.spawnPosition.clone();
+          }
+          this.behaviors.patrol.start();
+          this.log('info', '巡逻模式已开启', '🚶');
+        } else {
+          this.behaviors.patrol.stop();
+          this.log('info', '巡逻模式已关闭', '🚶');
+        }
+      }
       if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     }
+  }
+
+  /**
+   * 设置定时发送 /restart 命令
+   * @param {number} minutes - 间隔分钟数，0 表示禁用
+   */
+  setRestartTimer(minutes) {
+    // 清除现有定时器
+    if (this.restartCommandTimer) {
+      clearInterval(this.restartCommandTimer);
+      this.restartCommandTimer = null;
+    }
+
+    if (minutes > 0 && this.bot) {
+      const intervalMs = minutes * 60 * 1000;
+      const nextRestart = new Date(Date.now() + intervalMs);
+
+      this.status.restartTimer = {
+        enabled: true,
+        intervalMinutes: minutes,
+        nextRestart: nextRestart.toISOString()
+      };
+
+      this.restartCommandTimer = setInterval(() => {
+        if (this.bot && this.status.connected) {
+          this.bot.chat('/restart');
+          this.log('info', '执行定时重启命令 /restart', '⏰');
+          // 更新下次重启时间
+          this.status.restartTimer.nextRestart = new Date(Date.now() + intervalMs).toISOString();
+          if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+        }
+      }, intervalMs);
+
+      this.log('info', `定时重启已设置: 每 ${minutes} 分钟执行 /restart`, '⏰');
+    } else {
+      this.status.restartTimer = {
+        enabled: false,
+        intervalMinutes: 0,
+        nextRestart: null
+      };
+      this.log('info', '定时重启已禁用', '⏰');
+    }
+
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    return this.status.restartTimer;
+  }
+
+  /**
+   * 立即发送 /restart 命令
+   */
+  sendRestartCommand() {
+    if (this.bot && this.status.connected) {
+      this.bot.chat('/restart');
+      this.log('info', '立即发送 /restart 命令', '⚡');
+      return { success: true, message: '已发送 /restart' };
+    }
+    return { success: false, message: 'Bot 未连接' };
   }
 
   async handleCommand(username, message) {
