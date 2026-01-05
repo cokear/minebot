@@ -357,6 +357,17 @@ app.put('/api/bots/:id', async (req, res) => {
     const { name, username, host, port } = req.body;
     const id = req.params.id;
 
+    // Validate username format if provided
+    if (username !== undefined && username !== '') {
+      const usernameRegex = /^[a-zA-Z0-9_]{3,16}$/;
+      if (!usernameRegex.test(username)) {
+        return res.status(400).json({
+          success: false,
+          error: '用户名必须是3-16个字符，只能包含字母、数字和下划线'
+        });
+      }
+    }
+
     // Update in config for persistence
     const updates = {};
     if (name !== undefined) updates.name = name;

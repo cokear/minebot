@@ -171,6 +171,19 @@ export function MultiServerPanel() {
   };
 
   const handleUpdateServer = async (id: string) => {
+    // 验证用户名格式
+    if (editForm.username) {
+      const usernameRegex = /^[a-zA-Z0-9_]{3,16}$/;
+      if (!usernameRegex.test(editForm.username)) {
+        toast({
+          title: "用户名格式错误",
+          description: "用户名必须是3-16个字符，只能包含字母、数字和下划线",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       await api.updateServer(id, {

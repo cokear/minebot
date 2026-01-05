@@ -1,7 +1,6 @@
 import { Header } from "@/components/Header";
 import { MultiServerPanel } from "@/components/MultiServerPanel";
 import { RenewalPanel } from "@/components/RenewalPanel";
-import { QuickControlPanel } from "@/components/QuickControlPanel";
 import { ConsoleLog } from "@/components/ConsoleLog";
 import { useWebSocket } from "@/hooks/useBot";
 import { Server, Wifi, WifiOff, Users, Box } from "lucide-react";
@@ -75,16 +74,11 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Main Content - Three Columns */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column - Server Management (wider) */}
+        {/* Main Content - Two Columns */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left Column - Server Management */}
           <div className="lg:col-span-1">
             <MultiServerPanel />
-          </div>
-
-          {/* Middle Column - Quick Controls */}
-          <div className="lg:col-span-1">
-            <QuickControlPanel />
           </div>
 
           {/* Right Column - Renewal */}
