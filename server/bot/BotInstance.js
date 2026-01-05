@@ -535,18 +535,25 @@ export class BotInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/command`;
-      await axios.post(url, { command }, {
+      this.log('info', `正在发送面板命令: ${command} -> ${url}`, '🖥️');
+
+      const response = await axios.post(url, { command }, {
         headers: {
           'Authorization': `Bearer ${panel.apiKey}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
-        }
+        },
+        timeout: 10000 // 10秒超时
       });
+
       this.log('success', `面板命令已发送: ${command}`, '🖥️');
       return { success: true, message: `已发送: ${command}` };
     } catch (error) {
-      this.log('error', `面板命令失败: ${error.message}`, '✗');
-      return { success: false, message: error.message };
+      const errMsg = error.response?.data?.errors?.[0]?.detail
+        || error.response?.data?.message
+        || error.message;
+      this.log('error', `面板命令失败: ${errMsg}`, '✗');
+      return { success: false, message: errMsg };
     }
   }
 

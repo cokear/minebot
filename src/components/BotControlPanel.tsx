@@ -207,12 +207,25 @@ export function BotControlPanel({
     }
   };
 
-  // 立即发送重启命令
+  // 立即发送重启命令（机器人聊天）
   const handleRestartNow = async () => {
     setLoading("restartNow");
     try {
       await api.sendRestartCommand(botId);
       toast({ title: "已发送", description: "/restart 命令已发送" });
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // 通过翼龙面板发送重启命令到控制台
+  const handlePanelRestart = async () => {
+    setLoading("panelRestart");
+    try {
+      await api.sendPanelCommand(botId, "restart");
+      toast({ title: "已发送", description: "restart 命令已发送到服务器控制台" });
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
     } finally {
@@ -430,17 +443,28 @@ export function BotControlPanel({
                   {loading === "pterodactyl" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                   保存面板配置
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleAutoOp}
-                  disabled={loading === "autoOp" || !panelUrl}
-                  className="w-full"
-                >
-                  {loading === "autoOp" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Crown className="h-4 w-4 mr-1" />}
-                  给机器人 OP 权限
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleAutoOp}
+                    disabled={loading === "autoOp" || !panelUrl}
+                    className="flex-1"
+                  >
+                    {loading === "autoOp" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Crown className="h-4 w-4 mr-1" />}
+                    给机器人 OP
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handlePanelRestart}
+                    disabled={loading === "panelRestart" || !panelUrl}
+                    className="flex-1"
+                  >
+                    {loading === "panelRestart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
+                    重启服务器
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  配置翼龙面板后，可以通过面板控制台发送命令，包括自动给机器人 OP 权限。
+                  通过翼龙面板控制台直接发送命令，无需机器人权限。
                 </p>
               </TabsContent>
             </Tabs>
