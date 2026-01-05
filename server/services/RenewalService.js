@@ -415,12 +415,31 @@ export class RenewalService {
       // 检查是否登录成功（页面是否还在登录页）
       const currentUrl = page.url();
       const currentContent = await page.content();
-      if (currentContent.includes('Invalid') || currentContent.includes('incorrect') || currentContent.includes('wrong')) {
+
+      // 检查是否还在登录页
+      const stillOnLoginPage = currentUrl.includes('/login') ||
+                               currentUrl.includes('/auth') ||
+                               currentContent.includes('Sign in') ||
+                               currentContent.includes('Login') ||
+                               currentContent.includes('登录');
+
+      // 检查是否有错误信息
+      const hasError = currentContent.includes('Invalid') ||
+                      currentContent.includes('incorrect') ||
+                      currentContent.includes('wrong') ||
+                      currentContent.includes('credentials') ||
+                      currentContent.includes('failed');
+
+      if (hasError) {
         this.log('error', '登录失败：账号或密码错误', id);
         throw new Error('登录失败：账号或密码错误');
       }
 
       this.log('info', `登录后页面: ${currentUrl}`, id);
+
+      if (stillOnLoginPage) {
+        this.log('warning', '登录后仍在登录页面，可能需要验证或登录失败', id);
+      }
 
       // 获取 Cookies
       const cookies = await page.cookies();
@@ -461,6 +480,22 @@ export class RenewalService {
       return null;
     }
     return cookies.map(c => `${c.name}=${c.value}`).join('; ');
+  }
+
+  /**
+   * 从缓存的 Cookie 中获取 XSRF-TOKEN
+   */
+  getXsrfToken(id) {
+    const cookies = this.cookies.get(id);
+    if (!cookies) return null;
+    const xsrfCookie = cookies.find(c => c.name === 'XSRF-TOKEN');
+    if (!xsrfCookie) return null;
+    // XSRF-TOKEN 通常是 URL 编码的，需要解码
+    try {
+      return decodeURIComponent(xsrfCookie.value);
+    } catch {
+      return xsrfCookie.value;
+    }
   }
 
   /**
@@ -508,16 +543,26 @@ export class RenewalService {
       // 如果有自动登录获取的 Cookie，使用它替换或添加到 headers
       if (cookieString && renewal.autoLogin) {
         requestHeaders['Cookie'] = cookieString;
+        // 添加 XSRF-TOKEN 到请求头（翼龙面板需要）
+        const xsrfToken = this.getXsrfToken(id);
+        if (xsrfToken) {
+          requestHeaders['X-XSRF-TOKEN'] = xsrfToken;
+          this.log('info', '已添加 X-XSRF-TOKEN 请求头', id);
+        }
       }
 
       // 如果使用代理，添加代理所需的头信息
       if (useProxy) {
         requestHeaders['X-Target-URL'] = renewal.url;
         requestHeaders['X-Target-Method'] = renewal.method;
-        // 将实际的请求头（包括 Cookie）传给代理
+        // 将实际的请求头（包括 Cookie 和 XSRF-TOKEN）传给代理
         const headersForProxy = { ...renewal.headers };
         if (cookieString && renewal.autoLogin) {
           headersForProxy['Cookie'] = cookieString;
+          const xsrfToken = this.getXsrfToken(id);
+          if (xsrfToken) {
+            headersForProxy['X-XSRF-TOKEN'] = xsrfToken;
+          }
         }
         requestHeaders['X-Target-Headers'] = JSON.stringify(headersForProxy);
       }
