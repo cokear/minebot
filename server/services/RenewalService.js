@@ -1155,36 +1155,59 @@ export class RenewalService {
 
       // 自动查找续期按钮
       if (!renewButton) {
-        const buttonSelectors = [
-          // 包含特定文字的按钮和链接
-          'button',
-          'a',  // 所有链接
-          'a.btn',
-          '[role="button"]',
-          'input[type="submit"]',
-          'input[type="button"]',
-          'div[onclick]',
-          'span[onclick]'
-        ];
+        // 先尝试通过 onclick 属性查找包含 renewal/renew 的元素
+        try {
+          const renewalByOnclick = await page.$('a[onclick*="Renewal"], a[onclick*="renewal"], a[onclick*="Renew"], a[onclick*="renew"], button[onclick*="Renewal"], button[onclick*="renewal"]');
+          if (renewalByOnclick) {
+            renewButton = renewalByOnclick;
+            this.log('info', '通过 onclick 属性找到续期按钮', id);
+          }
+        } catch (e) {}
 
-        const renewKeywords = ['Renew Server', 'renew server', 'RENEW SERVER', 'renew', 'Renew', 'RENEW', '续期', '续订', '延长', 'extend', 'Extend'];
-
-        for (const selector of buttonSelectors) {
+        // 尝试通过 class 查找
+        if (!renewButton) {
           try {
-            const buttons = await page.$$(selector);
-            for (const btn of buttons) {
-              const text = await page.evaluate(el => el.textContent || el.value || '', btn);
-              for (const keyword of renewKeywords) {
-                if (text.includes(keyword)) {
-                  renewButton = btn;
-                  this.log('info', `找到续期按钮 (包含 "${keyword}"): ${text.trim().substring(0, 50)}`, id);
-                  break;
+            const renewalByClass = await page.$('.action-button.action-purple, .renew-button, .renewal-button, [class*="renew"]');
+            if (renewalByClass) {
+              renewButton = renewalByClass;
+              this.log('info', '通过 class 找到续期按钮', id);
+            }
+          } catch (e) {}
+        }
+
+        // 通过文字内容查找
+        if (!renewButton) {
+          const buttonSelectors = [
+            // 包含特定文字的按钮和链接
+            'button',
+            'a',  // 所有链接
+            'a.btn',
+            '[role="button"]',
+            'input[type="submit"]',
+            'input[type="button"]',
+            'div[onclick]',
+            'span[onclick]'
+          ];
+
+          const renewKeywords = ['Renew Server', 'renew server', 'RENEW SERVER', 'renew', 'Renew', 'RENEW', '续期', '续订', '延长', 'extend', 'Extend'];
+
+          for (const selector of buttonSelectors) {
+            try {
+              const buttons = await page.$$(selector);
+              for (const btn of buttons) {
+                const text = await page.evaluate(el => el.textContent || el.value || '', btn);
+                for (const keyword of renewKeywords) {
+                  if (text.includes(keyword)) {
+                    renewButton = btn;
+                    this.log('info', `找到续期按钮 (包含 "${keyword}"): ${text.trim().substring(0, 50)}`, id);
+                    break;
+                  }
                 }
+                if (renewButton) break;
               }
               if (renewButton) break;
-            }
-            if (renewButton) break;
-          } catch (e) {}
+            } catch (e) {}
+          }
         }
       }
 
