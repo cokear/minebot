@@ -1131,11 +1131,14 @@ export class RenewalService {
       // 查找续期按钮
       this.log('info', '查找续期按钮...', id);
 
-      // 先滚动页面，确保所有元素都加载
+      // 等待页面完全加载
+      await this.delay(3000);
+
+      // 滚动页面，确保所有元素都加载
       await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight / 2);
+        window.scrollTo(0, document.body.scrollHeight);
       });
-      await this.delay(1000);
+      await this.delay(2000);
       await page.evaluate(() => {
         window.scrollTo(0, 0);
       });
@@ -1212,15 +1215,17 @@ export class RenewalService {
       }
 
       if (!renewButton) {
-        // 打印页面上所有按钮用于调试
-        const allButtons = await page.$$eval('button, a.btn, [role="button"]', buttons =>
+        // 打印页面上所有按钮和链接用于调试
+        const allButtons = await page.$$eval('button, a, [role="button"], [onclick]', buttons =>
           buttons.map(b => ({
             tag: b.tagName,
             text: (b.textContent || '').trim().substring(0, 50),
-            class: b.className
-          }))
+            class: b.className,
+            onclick: b.getAttribute('onclick') ? b.getAttribute('onclick').substring(0, 50) : null,
+            href: b.getAttribute('href')
+          })).filter(b => b.text || b.onclick)
         );
-        this.log('error', `未找到续期按钮，页面按钮: ${JSON.stringify(allButtons.slice(0, 10))}`, id);
+        this.log('error', `未找到续期按钮，页面元素: ${JSON.stringify(allButtons.slice(0, 15))}`, id);
         throw new Error('找不到续期按钮');
       }
 
