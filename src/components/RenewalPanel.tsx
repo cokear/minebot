@@ -583,7 +583,7 @@ export function RenewalPanel() {
       <CardContent className="space-y-3">
         {/* 全局日志面板 */}
         {showLogs && (
-          <div className="p-3 rounded-lg border bg-muted/50 mb-3">
+          <div className="p-3 rounded-lg border bg-muted/50 mb-3 overflow-hidden">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium flex items-center gap-2">
                 <ScrollText className="h-4 w-4" />
@@ -597,7 +597,7 @@ export function RenewalPanel() {
                 清空
               </Button>
             </div>
-            <div className="h-48 overflow-y-auto space-y-1 font-mono text-xs">
+            <div className="h-48 overflow-y-auto overflow-x-hidden space-y-1 font-mono text-xs">
               {globalLogs.length === 0 ? (
                 <div className="text-muted-foreground text-center py-4">
                   暂无日志
@@ -606,15 +606,15 @@ export function RenewalPanel() {
                 globalLogs.slice().reverse().map((log) => (
                   <div
                     key={log.id}
-                    className={`flex gap-2 ${
+                    className={`break-all ${
                       log.type === 'error' ? 'text-red-500' :
                       log.type === 'success' ? 'text-green-500' :
                       'text-muted-foreground'
                     }`}
                   >
-                    <span className="text-muted-foreground">[{log.timestamp}]</span>
-                    {log.renewalId && <span className="text-blue-500">[{log.renewalId}]</span>}
-                    <span>{log.message}</span>
+                    <span className="text-muted-foreground whitespace-nowrap">[{log.timestamp}]</span>
+                    {log.renewalId && <span className="text-blue-500 whitespace-nowrap"> [{log.renewalId.substring(0, 15)}...]</span>}
+                    <span> {log.message}</span>
                   </div>
                 ))
               )}
