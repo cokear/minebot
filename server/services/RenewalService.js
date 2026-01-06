@@ -795,6 +795,20 @@ export class RenewalService {
       this.log('info', '等待页面渲染完成...', id);
       await this.delay(2000);
 
+      // 检查是否已经登录（浏览器可能保留了之前的登录状态）
+      let currentUrl = page.url();
+      const alreadyLoggedIn = !currentUrl.includes('/login') &&
+                              !currentUrl.includes('/auth') &&
+                              !currentUrl.includes('/sign-in') &&
+                              !currentUrl.includes('signin');
+
+      // 如果已登录，跳过登录流程，直接进入续期
+      if (alreadyLoggedIn) {
+        this.log('info', `检测到已登录状态，跳过登录步骤 (当前页面: ${currentUrl})`, id);
+      } else {
+        // ========== 未登录，执行登录流程 ==========
+        this.log('info', '未登录，开始登录流程...', id);
+
       // 检查并处理 Cookie 同意对话框 (GDPR)
       try {
         const consentBtn = await page.$('.fc-cta-consent') ||
@@ -1136,6 +1150,7 @@ export class RenewalService {
           this.log('warning', `登录后仍在登录页面，页面标题: ${pageTitle}`, id);
         }
       }
+      } // 结束 if (!alreadyLoggedIn) 登录流程
 
       // ========== 续期部分 ==========
 
