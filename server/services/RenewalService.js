@@ -1201,11 +1201,9 @@ export class RenewalService {
 
       // ========== 续期部分 ==========
 
-      // 导航到续期页面
-      const targetUrl = renewPageUrl || url;
-
-      this.log('info', `导航到续期页面: ${targetUrl}`, id);
-      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+      // 导航到续期页面（url 是服务器页面 URL）
+      this.log('info', `导航到续期页面: ${url}`, id);
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
       // 等待页面加载，检查 Cloudflare 5秒盾
       await this.delay(3000);
