@@ -443,16 +443,23 @@ export function RenewalPanel() {
                   </p>
                 </div>
 
-                {/* 续期 URL */}
+                {/* 续期 URL / 续期页面 URL */}
                 <div className="space-y-2">
-                  <Label>续期 URL *</Label>
+                  <Label>
+                    {formData.mode === "browserClick" ? "服务器页面 URL *" : "续期 URL *"}
+                  </Label>
                   <Input
                     placeholder={formData.mode === "browserClick"
-                      ? "https://panel.example.com/server/xxx（服务器详情页）"
+                      ? "https://dash.zampto.net/server?id=2574"
                       : "https://panel.example.com/api/renew"}
                     value={formData.url}
                     onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                   />
+                  {formData.mode === "browserClick" && (
+                    <p className="text-xs text-muted-foreground">
+                      登录后将导航到此页面，然后点击续期按钮
+                    </p>
+                  )}
                 </div>
 
                 {/* 登录配置（autoLoginHttp 和 browserClick 模式） */}
