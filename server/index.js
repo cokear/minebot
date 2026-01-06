@@ -678,6 +678,17 @@ app.post('/api/renewals/:id/test', async (req, res) => {
   }
 });
 
+// 测试代理连接
+app.post('/api/renewals/test-proxy', async (req, res) => {
+  try {
+    const { proxyUrl, testUrl } = req.body;
+    const result = await renewalService.testProxy(proxyUrl, testUrl);
+    res.json({ success: result.success, result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // 启动续期
 app.post('/api/renewals/:id/start', (req, res) => {
   try {

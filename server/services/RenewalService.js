@@ -140,6 +140,9 @@ export class RenewalService {
       // 浏览器点击配置（browserClick 模式）
       renewButtonSelector: renewalConfig.renewButtonSelector || '',
 
+      // 浏览器代理配置（browserClick 模式）
+      browserProxy: renewalConfig.browserProxy || '',  // 格式: socks5://127.0.0.1:1080
+
       // 状态
       lastRun: null,
       lastResult: null
@@ -253,8 +256,28 @@ export class RenewalService {
 
   /**
    * 获取或启动浏览器实例
+   * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080
    */
-  async getBrowser() {
+  async getBrowser(proxyUrl = null) {
+    // 如果指定了代理，每次都创建新的浏览器实例
+    if (proxyUrl) {
+      this.log('info', `启动无头浏览器 (代理: ${proxyUrl})...`);
+      const args = [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--window-size=1920,1080',
+        `--proxy-server=${proxyUrl}`
+      ];
+      return await puppeteer.launch({
+        headless: 'new',
+        args
+      });
+    }
+
+    // 无代理时复用浏览器实例
     if (!this.browser || !this.browser.isConnected()) {
       this.log('info', '启动无头浏览器...');
       this.browser = await puppeteer.launch({
@@ -779,15 +802,17 @@ export class RenewalService {
    * 使用浏览器点击续期按钮
    */
   async browserClickRenew(renewal) {
-    const { id, url, renewPageUrl, renewButtonSelector, loginUrl, panelUsername, panelPassword } = renewal;
+    const { id, url, renewButtonSelector, loginUrl, panelUsername, panelPassword, browserProxy } = renewal;
 
     if (!loginUrl || !panelUsername || !panelPassword) {
       throw new Error('浏览器点击续期需要配置登录URL、账号和密码');
     }
 
-    this.log('info', '开始浏览器点击续期...', id);
+    this.log('info', `开始浏览器点击续期...${browserProxy ? ` (代理: ${browserProxy})` : ''}`, id);
 
-    const browser = await this.getBrowser();
+    // 如果有代理，创建独立的浏览器实例
+    const browser = await this.getBrowser(browserProxy || null);
+    const isProxyBrowser = !!browserProxy;
     const page = await browser.newPage();
 
     try {
@@ -1444,6 +1469,10 @@ export class RenewalService {
       };
     } finally {
       await page.close();
+      // 如果是代理浏览器实例，需要关闭整个浏览器
+      if (isProxyBrowser) {
+        await browser.close();
+      }
     }
   }
 
@@ -1630,6 +1659,56 @@ export class RenewalService {
    */
   async testRenewal(id) {
     return this.executeRenewal(id);
+  }
+
+  /**
+   * 测试代理连接
+   * @param {string} proxyUrl - 代理地址，如 socks5://127.0.0.1:1080
+   * @param {string} testUrl - 测试 URL，默认 https://httpbin.org/ip
+   */
+  async testProxy(proxyUrl, testUrl = 'https://httpbin.org/ip') {
+    if (!proxyUrl) {
+      return { success: false, error: '代理地址不能为空' };
+    }
+
+    this.log('info', `测试代理连接: ${proxyUrl}`);
+
+    let browser = null;
+    let page = null;
+
+    try {
+      browser = await this.getBrowser(proxyUrl);
+      page = await browser.newPage();
+
+      await page.setViewport({ width: 1280, height: 720 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+
+      // 设置较短的超时
+      await page.goto(testUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      const content = await page.content();
+      const bodyText = await page.evaluate(() => document.body.innerText);
+
+      this.log('success', `代理测试成功: ${proxyUrl}`);
+
+      return {
+        success: true,
+        message: '代理连接成功',
+        response: bodyText.substring(0, 200),
+        proxyUrl
+      };
+    } catch (error) {
+      this.log('error', `代理测试失败: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        message: `代理连接失败: ${error.message}`,
+        proxyUrl
+      };
+    } finally {
+      if (page) await page.close();
+      if (browser) await browser.close();
+    }
   }
 
   /**

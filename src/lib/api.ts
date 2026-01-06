@@ -93,6 +93,9 @@ export interface RenewalConfig {
   // 浏览器点击配置（browserClick 模式）
   renewButtonSelector: string;
 
+  // 浏览器代理配置（browserClick 模式）
+  browserProxy?: string;  // 格式: socks5://127.0.0.1:1080
+
   // 状态
   lastRun: string | null;
   lastResult: RenewalResult | null;
@@ -420,6 +423,13 @@ class ApiService {
 
   async testRenewal(id: string): Promise<{ success: boolean; result: RenewalResult }> {
     return this.request(`/api/renewals/${id}/test`, { method: 'POST' });
+  }
+
+  async testProxy(proxyUrl: string, testUrl?: string): Promise<{ success: boolean; result: { success: boolean; message: string; response?: string; error?: string } }> {
+    return this.request('/api/renewals/test-proxy', {
+      method: 'POST',
+      body: JSON.stringify({ proxyUrl, testUrl }),
+    });
   }
 
   async startRenewal(id: string): Promise<{ success: boolean }> {

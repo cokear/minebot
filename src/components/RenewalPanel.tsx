@@ -83,6 +83,9 @@ interface RenewalFormData {
 
   // 浏览器点击配置（browserClick 模式）
   renewButtonSelector: string;
+
+  // 浏览器代理配置（browserClick 模式）
+  browserProxy: string;
 }
 
 const defaultFormData: RenewalFormData = {
@@ -100,6 +103,7 @@ const defaultFormData: RenewalFormData = {
   panelUsername: "",
   panelPassword: "",
   renewButtonSelector: "",
+  browserProxy: "",
 };
 
 export function RenewalPanel() {
@@ -214,6 +218,7 @@ export function RenewalPanel() {
         panelUsername: formData.panelUsername,
         panelPassword: formData.panelPassword,
         renewButtonSelector: formData.renewButtonSelector,
+        browserProxy: formData.browserProxy,
       };
 
       if (editingId) {
@@ -268,6 +273,7 @@ export function RenewalPanel() {
       panelUsername: renewal.panelUsername || "",
       panelPassword: renewal.panelPassword || "",
       renewButtonSelector: renewal.renewButtonSelector || "",
+      browserProxy: renewal.browserProxy || "",
     });
     setEditingId(renewal.id);
     setDialogOpen(true);
@@ -501,13 +507,54 @@ export function RenewalPanel() {
 
                 {/* 浏览器点击配置（browserClick 模式） */}
                 {formData.mode === "browserClick" && (
-                  <div className="space-y-2">
-                    <Label className="text-xs">续期按钮选择器（可选）</Label>
-                    <Input
-                      placeholder="留空自动查找 Renew/续期 按钮"
-                      value={formData.renewButtonSelector}
-                      onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
-                    />
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-xs">续期按钮选择器（可选）</Label>
+                      <Input
+                        placeholder="留空自动查找 Renew/续期 按钮"
+                        value={formData.renewButtonSelector}
+                        onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">浏览器代理（可选）</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="socks5://127.0.0.1:1080"
+                          value={formData.browserProxy}
+                          onChange={(e) => setFormData({ ...formData, browserProxy: e.target.value })}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={!formData.browserProxy || loading}
+                          onClick={async () => {
+                            if (!formData.browserProxy) return;
+                            setLoading(true);
+                            try {
+                              const result = await api.testProxy(formData.browserProxy);
+                              if (result.result.success) {
+                                toast({ title: "代理测试成功", description: result.result.message });
+                              } else {
+                                toast({ title: "代理测试失败", description: result.result.message, variant: "destructive" });
+                              }
+                            } catch (error) {
+                              toast({ title: "代理测试失败", description: String(error), variant: "destructive" });
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                        >
+                          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube className="h-3 w-3" />}
+                          <span className="ml-1">测试</span>
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        支持 HTTP/HTTPS/SOCKS4/SOCKS5 代理，如需使用 hy2 请先配置本地代理客户端
+                      </p>
+                    </div>
                   </div>
                 )}
 
