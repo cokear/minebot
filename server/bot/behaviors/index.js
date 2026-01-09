@@ -154,175 +154,86 @@ export class AttackBehavior {
 }
 
 /**
- * 巡逻行为
+ * 巡逻行为 - 参考 Pathfinder PRO 实现
  */
 export class PatrolBehavior {
   constructor(bot, goals, logFn = null) {
     this.bot = bot;
     this.goals = goals;
-    this.log = logFn; // 日志函数
+    this.log = logFn;
     this.active = false;
-    this.waypoints = [];
-    this.currentIndex = 0;
-    this.interval = null;
-    this.radius = 12; // 随机巡逻半径
-    this.centerPos = null; // 巡逻中心点
+    this.centerPos = null;
     this.isMoving = false;
-    this.patrolTimeout = null;
-    this.moveTimeout = null; // 移动超时定时器
+    this.patrolInterval = null;
+    this.radius = 12;
   }
 
-  start(waypoints = null) {
+  start() {
     this.active = true;
     this.isMoving = false;
 
-    // 记录当前位置作为中心点（如果没有设置的话）
-    if (!this.centerPos && this.bot?.entity) {
+    // 记录当前位置作为中心点
+    if (this.bot?.entity) {
       this.centerPos = this.bot.entity.position.clone();
       if (this.log) {
         this.log('info', `巡逻中心点: X:${Math.floor(this.centerPos.x)} Y:${Math.floor(this.centerPos.y)} Z:${Math.floor(this.centerPos.z)}`, '📍');
       }
     }
 
-    if (waypoints && waypoints.length > 0) {
-      // 使用指定路径点
-      this.waypoints = waypoints;
-      this.currentIndex = 0;
-      this.patrolWaypoints();
-    } else {
-      // 随机巡逻
-      this.startRandomPatrol();
-    }
+    // 监听到达目标
+    this.onGoalReachedBound = () => {
+      this.isMoving = false;
+      if (this.log && this.bot?.entity) {
+        const pos = this.bot.entity.position;
+        this.log('info', `巡逻到达: X:${Math.floor(pos.x)} Z:${Math.floor(pos.z)}`, '📍');
+      }
+    };
+    this.bot.on('goal_reached', this.onGoalReachedBound);
+
+    // 每 8 秒检查一次，70% 概率移动（和 Pathfinder PRO 一样）
+    this.patrolInterval = setInterval(() => {
+      if (!this.active || !this.bot?.entity) return;
+
+      if (!this.isMoving && Math.random() > 0.3) {
+        this.doMove();
+      }
+    }, 8000);
+
+    // 立即开始第一次移动
+    this.doMove();
 
     return { success: true, message: '开始巡逻' };
   }
 
-  startRandomPatrol() {
-    if (!this.active || !this.bot) return;
-
-    // 监听到达目标事件
-    this.onGoalReachedBound = this.onGoalReached.bind(this);
-    this.bot.on('goal_reached', this.onGoalReachedBound);
-
-    // 开始第一次巡逻
-    this.doRandomMove();
-  }
-
-  onGoalReached() {
-    if (!this.active) return;
-    this.isMoving = false;
-
-    // 清除移动超时
-    if (this.moveTimeout) {
-      clearTimeout(this.moveTimeout);
-      this.moveTimeout = null;
-    }
-
-    // 记录到达位置
-    if (this.log && this.bot?.entity) {
-      const pos = this.bot.entity.position;
-      this.log('info', `巡逻到达: X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}`, '📍');
-    }
-
-    // 随机等待后继续巡逻
-    const waitTime = 3000 + Math.random() * 5000;
-    this.patrolTimeout = setTimeout(() => {
-      if (this.active) {
-        this.doRandomMove();
-      }
-    }, waitTime);
-  }
-
-  doRandomMove() {
+  doMove() {
     if (!this.active || !this.bot?.entity || this.isMoving) return;
 
-    // 以中心点为基准随机移动
     const center = this.centerPos || this.bot.entity.position;
-    const offsetX = (Math.random() - 0.5) * this.radius * 2;
-    const offsetZ = (Math.random() - 0.5) * this.radius * 2;
-
-    const targetX = center.x + offsetX;
-    const targetZ = center.z + offsetZ;
+    const targetX = center.x + (Math.random() - 0.5) * this.radius * 2;
+    const targetZ = center.z + (Math.random() - 0.5) * this.radius * 2;
 
     try {
+      this.isMoving = true;
       const goal = new this.goals.GoalNear(targetX, center.y, targetZ, 1);
       this.bot.pathfinder.setGoal(goal);
-      this.isMoving = true;
 
       if (this.log) {
         this.log('info', `巡逻前往: X:${Math.floor(targetX)} Z:${Math.floor(targetZ)}`, '🚶');
       }
-
-      // 设置移动超时：30秒内没到达就重新移动
-      if (this.moveTimeout) {
-        clearTimeout(this.moveTimeout);
-      }
-      this.moveTimeout = setTimeout(() => {
-        if (this.active && this.isMoving) {
-          if (this.log) {
-            this.log('warning', '巡逻超时，重新选择目标', '⏱️');
-          }
-          this.isMoving = false;
-          this.bot.pathfinder.stop();
-          this.doRandomMove();
-        }
-      }, 30000);
-
     } catch (e) {
-      // 忽略路径规划错误
       this.isMoving = false;
-      // 路径规划失败，5秒后重试
-      this.patrolTimeout = setTimeout(() => {
-        if (this.active) {
-          this.doRandomMove();
-        }
-      }, 5000);
     }
-  }
-
-  patrolWaypoints() {
-    if (!this.active || !this.bot || this.waypoints.length === 0) return;
-
-    const wp = this.waypoints[this.currentIndex];
-    const goal = new this.goals.GoalNear(wp.x, wp.y, wp.z, 2);
-
-    this.bot.pathfinder.setGoal(goal);
-
-    this.bot.once('goal_reached', () => {
-      if (!this.active) return;
-      this.currentIndex = (this.currentIndex + 1) % this.waypoints.length;
-      setTimeout(() => this.patrolWaypoints(), 2000);
-    });
-  }
-
-  addWaypoint(x, y, z) {
-    this.waypoints.push({ x, y, z });
-    return { success: true, message: `添加路径点 (${x}, ${y}, ${z})` };
-  }
-
-  clearWaypoints() {
-    this.waypoints = [];
-    this.currentIndex = 0;
-    return { success: true, message: '清除所有路径点' };
   }
 
   stop() {
     this.active = false;
     this.isMoving = false;
 
-    // 清除定时器
-    if (this.patrolTimeout) {
-      clearTimeout(this.patrolTimeout);
-      this.patrolTimeout = null;
+    if (this.patrolInterval) {
+      clearInterval(this.patrolInterval);
+      this.patrolInterval = null;
     }
 
-    // 清除移动超时定时器
-    if (this.moveTimeout) {
-      clearTimeout(this.moveTimeout);
-      this.moveTimeout = null;
-    }
-
-    // 移除事件监听
     if (this.bot && this.onGoalReachedBound) {
       this.bot.removeListener('goal_reached', this.onGoalReachedBound);
       this.onGoalReachedBound = null;
@@ -331,16 +242,15 @@ export class PatrolBehavior {
     if (this.bot?.pathfinder) {
       this.bot.pathfinder.stop();
     }
+
     return { success: true, message: '停止巡逻' };
   }
 
   getStatus() {
     return {
       active: this.active,
-      waypoints: this.waypoints.length,
-      currentIndex: this.currentIndex,
-      radius: this.radius,
       isMoving: this.isMoving,
+      radius: this.radius,
       centerPos: this.centerPos ? {
         x: Math.round(this.centerPos.x),
         y: Math.round(this.centerPos.y),
