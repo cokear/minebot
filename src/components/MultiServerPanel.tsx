@@ -18,6 +18,9 @@ interface ServerConfig {
   connected?: boolean;
   serverAddress?: string;
   version?: string;
+  health?: number;
+  food?: number;
+  position?: { x: number; y: number; z: number };
   players?: string[];
   modes?: {
     follow?: boolean;
@@ -326,6 +329,14 @@ export function MultiServerPanel() {
                             {server.serverAddress || `${server.host}:${server.port}`}
                             {server.username && ` (${server.username})`}
                           </div>
+                          {/* 显示坐标和生命值 */}
+                          {server.connected && server.position && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              📍 X:{Math.floor(server.position.x)} Y:{Math.floor(server.position.y)} Z:{Math.floor(server.position.z)}
+                              {server.health !== undefined && ` | ❤️ ${Math.floor(server.health)}/20`}
+                              {server.food !== undefined && ` | 🍖 ${Math.floor(server.food)}/20`}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

@@ -194,7 +194,8 @@ export class BotInstance {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(15000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
+    // 固定 10 秒重连，快速恢复连接
+    const delay = 10000;
 
     this.log('info', `等待 ${delay/1000} 秒后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
 
