@@ -169,6 +169,7 @@ export class PatrolBehavior {
     this.centerPos = null; // 巡逻中心点
     this.isMoving = false;
     this.patrolTimeout = null;
+    this.moveTimeout = null; // 移动超时定时器
   }
 
   start(waypoints = null) {
@@ -200,7 +201,8 @@ export class PatrolBehavior {
     if (!this.active || !this.bot) return;
 
     // 监听到达目标事件
-    this.bot.on('goal_reached', this.onGoalReached.bind(this));
+    this.onGoalReachedBound = this.onGoalReached.bind(this);
+    this.bot.on('goal_reached', this.onGoalReachedBound);
 
     // 开始第一次巡逻
     this.doRandomMove();
@@ -209,6 +211,12 @@ export class PatrolBehavior {
   onGoalReached() {
     if (!this.active) return;
     this.isMoving = false;
+
+    // 清除移动超时
+    if (this.moveTimeout) {
+      clearTimeout(this.moveTimeout);
+      this.moveTimeout = null;
+    }
 
     // 记录到达位置
     if (this.log && this.bot?.entity) {
@@ -244,9 +252,31 @@ export class PatrolBehavior {
       if (this.log) {
         this.log('info', `巡逻前往: X:${Math.floor(targetX)} Z:${Math.floor(targetZ)}`, '🚶');
       }
+
+      // 设置移动超时：30秒内没到达就重新移动
+      if (this.moveTimeout) {
+        clearTimeout(this.moveTimeout);
+      }
+      this.moveTimeout = setTimeout(() => {
+        if (this.active && this.isMoving) {
+          if (this.log) {
+            this.log('warning', '巡逻超时，重新选择目标', '⏱️');
+          }
+          this.isMoving = false;
+          this.bot.pathfinder.stop();
+          this.doRandomMove();
+        }
+      }, 30000);
+
     } catch (e) {
       // 忽略路径规划错误
       this.isMoving = false;
+      // 路径规划失败，5秒后重试
+      this.patrolTimeout = setTimeout(() => {
+        if (this.active) {
+          this.doRandomMove();
+        }
+      }, 5000);
     }
   }
 
@@ -286,9 +316,16 @@ export class PatrolBehavior {
       this.patrolTimeout = null;
     }
 
+    // 清除移动超时定时器
+    if (this.moveTimeout) {
+      clearTimeout(this.moveTimeout);
+      this.moveTimeout = null;
+    }
+
     // 移除事件监听
-    if (this.bot) {
-      this.bot.removeListener('goal_reached', this.onGoalReached);
+    if (this.bot && this.onGoalReachedBound) {
+      this.bot.removeListener('goal_reached', this.onGoalReachedBound);
+      this.onGoalReachedBound = null;
     }
 
     if (this.bot?.pathfinder) {
