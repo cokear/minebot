@@ -219,8 +219,8 @@ export class BotInstance {
     }
 
     this.reconnectAttempts++;
-    // 固定 10 秒重连，快速恢复连接
-    const delay = 10000;
+    // 快速重连：3 秒
+    const delay = 3000;
 
     this.log('info', `等待 ${delay/1000} 秒后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
 
