@@ -190,6 +190,12 @@ export class PatrolBehavior {
     };
     this.bot.on('goal_reached', this.onGoalReachedBound);
 
+    // 监听路径停止（包括失败、中断等情况）
+    this.onPathStopBound = () => {
+      this.isMoving = false;
+    };
+    this.bot.on('path_stop', this.onPathStopBound);
+
     // 每 8 秒检查一次，70% 概率移动（和 Pathfinder PRO 一样）
     this.patrolInterval = setInterval(() => {
       if (!this.active || !this.bot?.entity) return;
@@ -237,6 +243,11 @@ export class PatrolBehavior {
     if (this.bot && this.onGoalReachedBound) {
       this.bot.removeListener('goal_reached', this.onGoalReachedBound);
       this.onGoalReachedBound = null;
+    }
+
+    if (this.bot && this.onPathStopBound) {
+      this.bot.removeListener('path_stop', this.onPathStopBound);
+      this.onPathStopBound = null;
     }
 
     if (this.bot?.pathfinder) {
