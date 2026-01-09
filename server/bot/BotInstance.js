@@ -19,8 +19,6 @@ export class BotInstance {
     this.bot = null;
     this.behaviors = null;
     this.reconnecting = false;
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 10;
     this.connectionTimeout = null;
     this.reconnectTimeout = null;
     this.activityMonitorInterval = null;
@@ -206,30 +204,31 @@ export class BotInstance {
     }, 30000);
   }
 
+  /**
+   * 简化的重连逻辑 - 参考 Pathfinder PRO
+   * 只要没有被销毁，就永远尝试重连
+   */
   scheduleReconnect() {
+    // 如果已经在重连中或已被销毁，跳过
     if (this.reconnecting || this.destroyed) return;
 
     this.reconnecting = true;
+    this.status.connected = false;
+
+    // 清理旧连接
     this.cleanup();
 
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.log('error', '已达到最大重连次数，停止重连', '✗');
-      this.reconnecting = false;
-      return;
-    }
-
-    this.reconnectAttempts++;
-    // 快速重连：3 秒
-    const delay = 3000;
-
-    this.log('info', `等待 ${delay/1000} 秒后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
+    // 5秒后尝试重连
+    const delay = 5000;
+    this.log('info', `${delay/1000} 秒后自动重连...`, '🔄');
 
     this.reconnectTimeout = setTimeout(() => {
       if (this.destroyed) return;
-      this.reconnecting = false; // 重置标志，允许下次重连
+
+      this.reconnecting = false;
       this.connect().catch(err => {
         this.log('error', `重连失败: ${err.message}`, '✗');
-        // 连接失败后继续尝试重连
+        // 失败后继续尝试，永不放弃
         this.scheduleReconnect();
       });
     }, delay);
