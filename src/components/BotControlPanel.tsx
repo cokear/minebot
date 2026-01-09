@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   UserPlus,
   Sword,
@@ -134,22 +134,9 @@ export function BotControlPanel({
     }
   };
 
-  // 同步props到state
-  useEffect(() => {
-    setRestartMinutes(restartTimer?.intervalMinutes?.toString() || "0");
-  }, [restartTimer?.intervalMinutes]);
-
-  useEffect(() => {
-    setAutoChatEnabled(autoChatProp?.enabled || false);
-    setAutoChatInterval(((autoChatProp?.interval || 60000) / 1000).toString());
-    setAutoChatMessages(autoChatProp?.messages?.join("\n") || "");
-  }, [autoChatProp]);
-
-  useEffect(() => {
-    setPanelUrl(pterodactyl?.url || "");
-    setPanelApiKey(pterodactyl?.apiKey || "");
-    setPanelServerId(pterodactyl?.serverId || "");
-  }, [pterodactyl]);
+  // 注意：不再使用 useEffect 同步 props 到 state
+  // 因为父组件每 5 秒刷新一次，会覆盖用户正在输入的内容
+  // 配置在打开对话框时通过 handleOpenSettings 获取
 
   const handleBehavior = async (behavior: string, enabled: boolean, options?: Record<string, unknown>) => {
     if (!connected) {
