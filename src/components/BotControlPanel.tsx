@@ -16,7 +16,8 @@ import {
   RotateCcw,
   Power,
   PowerOff,
-  Zap
+  Zap,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,7 @@ interface BotControlPanelProps {
     mining?: boolean;
     aiView?: boolean;
     autoChat?: boolean;
+    invincible?: boolean;
   };
   players?: string[];
   restartTimer?: {
@@ -325,6 +327,17 @@ export function BotControlPanel({
           <>
             <Button
               size="sm"
+              variant={modes.invincible ? "default" : "outline"}
+              onClick={() => handleModeToggle("invincible", !modes.invincible)}
+              disabled={loading !== null}
+              title="无敌模式 - 抗性255+生命恢复"
+              className={modes.invincible ? "bg-amber-600 hover:bg-amber-700" : ""}
+            >
+              {loading === "invincible" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4 mr-1" />}
+              <span className="text-xs">无敌</span>
+            </Button>
+            <Button
+              size="sm"
               variant={modes.aiView ? "default" : "outline"}
               onClick={() => handleModeToggle("aiView", !modes.aiView)}
               disabled={loading !== null}
@@ -557,6 +570,7 @@ export function BotControlPanel({
         <>
           {/* 状态徽章 */}
           <div className="flex flex-wrap gap-1">
+            {modes.invincible && <Badge className="bg-amber-600">无敌</Badge>}
             {modes.follow && <Badge variant="secondary">跟随中</Badge>}
             {modes.autoAttack && <Badge variant="destructive">攻击中</Badge>}
             {modes.patrol && <Badge variant="secondary">巡逻中</Badge>}
