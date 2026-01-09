@@ -611,7 +611,7 @@ export class BotInstance {
       return;
     }
 
-    const result = await this.sendPanelCommand(`op ${this.status.username}`);
+    const result = await this.sendPanelCommand(`/op ${this.status.username}`);
     if (result.success) {
       this.hasAutoOpped = true;
       this.log('success', `已自动授予 OP 权限: ${this.status.username}`, '👑');
