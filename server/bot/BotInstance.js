@@ -676,13 +676,23 @@ export class BotInstance {
       const errDetail = error.response?.data?.errors?.[0]?.detail;
       const errMsg = errDetail || error.response?.data?.message || error.message;
 
+      // 打印调试信息到控制台
+      console.log('[Power API Debug]', {
+        url: `${panel.url}/api/client/servers/${panel.serverId}/power`,
+        status,
+        apiKeyPrefix: panel.apiKey?.substring(0, 10) + '...',
+        response: error.response?.data
+      });
+
       let hint = '';
       if (status === 403) {
-        hint = ' (检查: API Key权限、IP限制、账号权限)';
+        hint = ' (403常见原因: 1.需要Client API Key而非Application API Key 2.API Key需在面板Account→API Credentials创建 3.检查Key是否有该服务器权限)';
       } else if (status === 404) {
-        hint = ' (检查: 服务器ID是否正确)';
+        hint = ' (检查: 服务器ID应为短ID如c5281c3e，不是数字ID)';
       } else if (status === 409) {
         hint = ' (服务器状态冲突，可能已在运行或已停止)';
+      } else if (status === 401) {
+        hint = ' (API Key无效或已过期)';
       }
 
       this.log('error', `电源信号失败 [${status}]: ${errMsg}${hint}`, '✗');
