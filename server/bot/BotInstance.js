@@ -226,9 +226,11 @@ export class BotInstance {
 
     this.reconnectTimeout = setTimeout(() => {
       if (this.destroyed) return;
+      this.reconnecting = false; // 重置标志，允许下次重连
       this.connect().catch(err => {
         this.log('error', `重连失败: ${err.message}`, '✗');
-        this.reconnecting = false;
+        // 连接失败后继续尝试重连
+        this.scheduleReconnect();
       });
     }, delay);
   }
