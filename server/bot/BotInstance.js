@@ -345,6 +345,30 @@ export class BotInstance {
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
         });
 
+        // 死亡自动重生
+        this.bot.on('death', () => {
+          this.log('warning', '机器人死亡，正在重生...', '💀');
+          // 停止所有行为
+          if (this.behaviors) {
+            this.behaviors.stopAll();
+          }
+          // 延迟一点再重生，避免太快
+          setTimeout(() => {
+            if (this.bot) {
+              this.bot.respawn();
+            }
+          }, 1000);
+        });
+
+        this.bot.on('respawn', () => {
+          this.log('info', '已重生', '✨');
+          // 更新出生点
+          if (this.bot?.entity) {
+            this.spawnPosition = this.bot.entity.position.clone();
+          }
+          if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+        });
+
         this.bot.on('move', () => {
           if (this.bot?.entity) {
             this.status.position = this.bot.entity.position;
