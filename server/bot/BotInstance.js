@@ -355,14 +355,26 @@ export class BotInstance {
           this.log('warning', '机器人死亡，正在重生...', '💀');
           // 停止所有行为
           if (this.behaviors) {
-            this.behaviors.stopAll();
+            try {
+              this.behaviors.stopAll();
+            } catch (e) {
+              this.log('error', `停止行为失败: ${e.message}`, '❌');
+            }
           }
           // 延迟一点再重生，避免太快
-          setTimeout(() => {
-            if (this.bot) {
+          const tryRespawn = (attempt = 1) => {
+            if (!this.bot) return;
+            try {
               this.bot.respawn();
+              this.log('info', `重生请求已发送 (尝试 ${attempt})`, '🔄');
+            } catch (e) {
+              this.log('error', `重生失败 (尝试 ${attempt}): ${e.message}`, '❌');
+              if (attempt < 3) {
+                setTimeout(() => tryRespawn(attempt + 1), 1000);
+              }
             }
-          }, 1000);
+          };
+          setTimeout(() => tryRespawn(), 500);
         });
 
         this.bot.on('respawn', () => {
