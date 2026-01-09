@@ -811,7 +811,7 @@ server.listen(PORT, '0.0.0.0', async () => {
 
       for (const serverConfig of servers) {
         try {
-          await botManager.addBot(serverConfig);
+          await botManager.addServer(serverConfig);
           console.log(`已连接: ${serverConfig.name || serverConfig.host}`);
         } catch (err) {
           console.error(`连接失败 ${serverConfig.host}: ${err.message}`);
