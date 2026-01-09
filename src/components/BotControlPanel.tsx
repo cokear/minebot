@@ -13,7 +13,10 @@ import {
   Settings,
   Eye,
   Crown,
-  RotateCcw
+  RotateCcw,
+  Power,
+  PowerOff,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -284,6 +287,24 @@ export function BotControlPanel({
     }
   };
 
+  // 发送电源信号
+  const handlePowerSignal = async (signal: 'start' | 'stop' | 'restart' | 'kill') => {
+    const signalNames = { start: '开机', stop: '关机', restart: '重启', kill: '强制终止' };
+    setLoading(`power-${signal}`);
+    try {
+      const result = await api.sendPowerSignal(botId, signal);
+      toast({
+        title: result.success ? "成功" : "失败",
+        description: result.message,
+        variant: result.success ? "default" : "destructive"
+      });
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(null);
+    }
+  };
+
   if (!connected) return null;
 
   return (
@@ -443,7 +464,51 @@ export function BotControlPanel({
                   {loading === "pterodactyl" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                   保存面板配置
                 </Button>
-                <div className="flex gap-2">
+
+                {/* 电源控制按钮 */}
+                <div className="pt-2 border-t">
+                  <Label className="text-sm text-muted-foreground mb-2 block">服务器电源控制</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="default"
+                      onClick={() => handlePowerSignal('start')}
+                      disabled={loading?.startsWith('power-') || !panelUrl}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {loading === "power-start" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Power className="h-4 w-4 mr-1" />}
+                      开机
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => handlePowerSignal('stop')}
+                      disabled={loading?.startsWith('power-') || !panelUrl}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      {loading === "power-stop" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <PowerOff className="h-4 w-4 mr-1" />}
+                      关机
+                    </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => handlePowerSignal('restart')}
+                      disabled={loading?.startsWith('power-') || !panelUrl}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {loading === "power-restart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
+                      重启
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handlePowerSignal('kill')}
+                      disabled={loading?.startsWith('power-') || !panelUrl}
+                    >
+                      {loading === "power-kill" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+                      强制终止
+                    </Button>
+                  </div>
+                </div>
+
+                {/* 其他操作按钮 */}
+                <div className="flex gap-2 pt-2 border-t">
                   <Button
                     variant="outline"
                     onClick={handleAutoOp}
@@ -454,17 +519,17 @@ export function BotControlPanel({
                     给机器人 OP
                   </Button>
                   <Button
-                    variant="destructive"
+                    variant="outline"
                     onClick={handlePanelRestart}
                     disabled={loading === "panelRestart" || !panelUrl}
                     className="flex-1"
                   >
                     {loading === "panelRestart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
-                    重启服务器
+                    控制台 restart
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  通过翼龙面板控制台直接发送命令，无需机器人权限。
+                  电源控制直接操作翼龙面板服务器电源状态。控制台命令发送到服务器控制台。
                 </p>
               </TabsContent>
             </Tabs>

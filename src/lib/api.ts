@@ -392,6 +392,14 @@ class ApiService {
     });
   }
 
+  // Send power signal via Pterodactyl panel (start/stop/restart/kill)
+  async sendPowerSignal(id: string, signal: 'start' | 'stop' | 'restart' | 'kill'): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/power`, {
+      method: 'POST',
+      body: JSON.stringify({ signal }),
+    });
+  }
+
   // Get bot config
   async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string } | null; autoOp: boolean } }> {
     return this.request(`/api/bots/${id}/config`);

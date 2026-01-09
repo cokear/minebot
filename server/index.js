@@ -577,6 +577,24 @@ app.post('/api/bots/:id/auto-op', async (req, res) => {
   }
 });
 
+// Send power signal via Pterodactyl panel (start/stop/restart/kill)
+app.post('/api/bots/:id/power', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { signal } = req.body;
+    if (!signal) {
+      return res.status(400).json({ success: false, error: '缺少 signal 参数 (start/stop/restart/kill)' });
+    }
+    const result = await bot.sendPowerSignal(signal);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Update auto-chat config for a specific bot
 app.post('/api/bots/:id/auto-chat', (req, res) => {
   try {

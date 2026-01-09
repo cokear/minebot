@@ -604,6 +604,62 @@ export class BotInstance {
     return this.status.pterodactyl;
   }
 
+  /**
+   * 发送翼龙面板电源信号
+   * @param {string} signal - 电源信号: 'start' | 'stop' | 'restart' | 'kill'
+   */
+  async sendPowerSignal(signal) {
+    const validSignals = ['start', 'stop', 'restart', 'kill'];
+    if (!validSignals.includes(signal)) {
+      return { success: false, message: `无效的电源信号，可选: ${validSignals.join(', ')}` };
+    }
+
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, message: '翼龙面板未配置' };
+    }
+
+    const signalNames = {
+      'start': '开机',
+      'stop': '关机',
+      'restart': '重启',
+      'kill': '强制终止'
+    };
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/power`;
+      this.log('info', `正在发送电源信号: ${signalNames[signal]} -> ${url}`, '⚡');
+
+      const response = await axios.post(url, { signal }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      this.log('success', `电源信号已发送: ${signalNames[signal]}`, '⚡');
+      return { success: true, message: `已发送: ${signalNames[signal]}` };
+    } catch (error) {
+      const status = error.response?.status;
+      const errDetail = error.response?.data?.errors?.[0]?.detail;
+      const errMsg = errDetail || error.response?.data?.message || error.message;
+
+      let hint = '';
+      if (status === 403) {
+        hint = ' (检查: API Key权限、IP限制、账号权限)';
+      } else if (status === 404) {
+        hint = ' (检查: 服务器ID是否正确)';
+      } else if (status === 409) {
+        hint = ' (服务器状态冲突，可能已在运行或已停止)';
+      }
+
+      this.log('error', `电源信号失败 [${status}]: ${errMsg}${hint}`, '✗');
+      return { success: false, message: `${errMsg}${hint}` };
+    }
+  }
+
   async handleCommand(username, message) {
     const parts = message.trim().split(' ');
     const cmd = parts[0].toLowerCase();
