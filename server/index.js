@@ -577,6 +577,33 @@ app.post('/api/bots/:id/auto-op', async (req, res) => {
   }
 });
 
+// Get logs for specific bot
+app.get('/api/bots/:id/logs', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    res.json({ success: true, logs: bot.getLogs() });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Clear logs for specific bot
+app.delete('/api/bots/:id/logs', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    bot.clearLogs();
+    res.json({ success: true, message: '日志已清空' });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Send power signal via Pterodactyl panel (start/stop/restart/kill)
 app.post('/api/bots/:id/power', async (req, res) => {
   try {

@@ -1,7 +1,6 @@
 import { Header } from "@/components/Header";
 import { MultiServerPanel } from "@/components/MultiServerPanel";
 import { RenewalPanel } from "@/components/RenewalPanel";
-import { ConsoleLog } from "@/components/ConsoleLog";
 import { useWebSocket } from "@/hooks/useBot";
 import { Server, Wifi, WifiOff, Users, Box } from "lucide-react";
 
@@ -85,11 +84,6 @@ const Index = () => {
           <div className="lg:col-span-1">
             <RenewalPanel />
           </div>
-        </div>
-
-        {/* Bottom Section - Console Log (Full Width) */}
-        <div className="mt-6">
-          <ConsoleLog />
         </div>
       </main>
 

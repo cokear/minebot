@@ -31,6 +31,10 @@ export class BotInstance {
     this.spawnPosition = null; // 记录出生点用于巡逻
     this.hasAutoOpped = false; // 是否已自动给予OP权限
 
+    // 每个机器人独立的日志
+    this.logs = [];
+    this.maxLogs = 100;
+
     this.status = {
       id: this.id,
       connected: false,
@@ -91,11 +95,28 @@ export class BotInstance {
       timestamp,
       type,
       icon,
-      message: `[${this.status.serverName}] ${message}`,
+      message,
       serverId: this.id
     };
+
+    // 存储到本机器人的日志数组
+    this.logs.push(entry);
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+
     console.log(`[${timestamp}] [${this.status.serverName}] ${icon} ${message}`);
     if (this.onLog) this.onLog(entry);
+  }
+
+  // 获取本机器人的日志
+  getLogs() {
+    return this.logs;
+  }
+
+  // 清空本机器人的日志
+  clearLogs() {
+    this.logs = [];
   }
 
   updateActivity() {

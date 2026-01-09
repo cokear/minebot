@@ -400,6 +400,16 @@ class ApiService {
     });
   }
 
+  // Get logs for specific bot
+  async getBotLogs(id: string): Promise<{ success: boolean; logs: LogEntry[] }> {
+    return this.request(`/api/bots/${id}/logs`);
+  }
+
+  // Clear logs for specific bot
+  async clearBotLogs(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/logs`, { method: 'DELETE' });
+  }
+
   // Get bot config
   async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string } | null; autoOp: boolean } }> {
     return this.request(`/api/bots/${id}/config`);

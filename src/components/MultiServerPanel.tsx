@@ -1,13 +1,22 @@
 import { useState, useEffect } from "react";
-import { Server, Plus, Trash2, Power, PowerOff, RefreshCw, Loader2, Pencil, X, Check } from "lucide-react";
+import { Server, Plus, Trash2, Power, PowerOff, RefreshCw, Loader2, Pencil, X, Check, Terminal, ChevronDown, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { BotControlPanel } from "./BotControlPanel";
+
+interface LogEntry {
+  id: number;
+  timestamp: string;
+  type: "info" | "success" | "warning" | "error" | "chat";
+  icon?: string;
+  message: string;
+}
 
 interface ServerConfig {
   id: string;
@@ -64,6 +73,9 @@ export function MultiServerPanel() {
     port: "25565",
     username: "",
   });
+  // 每个机器人的日志状态
+  const [botLogs, setBotLogs] = useState<Record<string, LogEntry[]>>({});
+  const [openLogs, setOpenLogs] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
   const fetchServers = async () => {
@@ -75,11 +87,54 @@ export function MultiServerPanel() {
     }
   };
 
+  // 获取单个机器人的日志
+  const fetchBotLogs = async (botId: string) => {
+    try {
+      const result = await api.getBotLogs(botId);
+      if (result.success) {
+        setBotLogs(prev => ({ ...prev, [botId]: result.logs }));
+      }
+    } catch (error) {
+      console.error("Failed to fetch bot logs:", error);
+    }
+  };
+
+  // 清空单个机器人的日志
+  const clearBotLogs = async (botId: string) => {
+    try {
+      await api.clearBotLogs(botId);
+      setBotLogs(prev => ({ ...prev, [botId]: [] }));
+      toast({ title: "成功", description: "日志已清空" });
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    }
+  };
+
+  // 切换日志面板
+  const toggleLogs = (botId: string) => {
+    const isOpen = !openLogs[botId];
+    setOpenLogs(prev => ({ ...prev, [botId]: isOpen }));
+    if (isOpen) {
+      fetchBotLogs(botId);
+    }
+  };
+
   useEffect(() => {
     fetchServers();
     const interval = setInterval(fetchServers, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // 自动刷新打开的日志
+  useEffect(() => {
+    const openBotIds = Object.entries(openLogs).filter(([, open]) => open).map(([id]) => id);
+    if (openBotIds.length === 0) return;
+
+    const interval = setInterval(() => {
+      openBotIds.forEach(id => fetchBotLogs(id));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [openLogs]);
 
   const handleAddServer = async () => {
     if (!newServer.host) {
@@ -384,6 +439,59 @@ export function MultiServerPanel() {
                       pterodactyl={server.pterodactyl}
                       onUpdate={fetchServers}
                     />
+
+                    {/* 日志面板 */}
+                    <Collapsible open={openLogs[server.id]} onOpenChange={() => toggleLogs(server.id)}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between mt-2">
+                          <div className="flex items-center gap-2">
+                            <Terminal className="h-4 w-4" />
+                            <span className="text-xs">控制台日志</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({botLogs[server.id]?.length || 0} 条)
+                            </span>
+                          </div>
+                          <ChevronDown className={`h-4 w-4 transition-transform ${openLogs[server.id] ? "rotate-180" : ""}`} />
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="mt-2 rounded-lg border bg-muted/30 overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/50">
+                            <span className="text-xs text-muted-foreground">实时日志</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => { e.stopPropagation(); clearBotLogs(server.id); }}
+                            >
+                              <Trash className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <div className="h-40 overflow-y-auto p-2 font-mono text-xs space-y-0.5">
+                            {(botLogs[server.id] || []).length === 0 ? (
+                              <div className="text-muted-foreground text-center py-4">暂无日志</div>
+                            ) : (
+                              (botLogs[server.id] || []).slice(-50).map((log) => (
+                                <div
+                                  key={log.id}
+                                  className={`flex items-start gap-1.5 ${
+                                    log.type === "error" ? "text-red-400" :
+                                    log.type === "warning" ? "text-yellow-400" :
+                                    log.type === "success" ? "text-green-400" :
+                                    log.type === "chat" ? "text-purple-400" :
+                                    "text-muted-foreground"
+                                  }`}
+                                >
+                                  <span className="shrink-0 opacity-60">[{log.timestamp}]</span>
+                                  {log.icon && <span className="shrink-0">{log.icon}</span>}
+                                  <span className="break-all">{log.message}</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </>
                 )}
               </div>
