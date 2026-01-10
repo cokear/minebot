@@ -202,10 +202,15 @@ export class ConfigManager {
     }
 
     // 确保每个服务器有完整的独立配置
+    // type: 'minecraft' (默认，游戏服务器) | 'panel' (纯面板服务器)
+    const serverType = serverConfig.type || 'minecraft';
+
     const fullConfig = {
       id: serverConfig.id,
       name: serverConfig.name || `Server ${serverConfig.id}`,
-      host: serverConfig.host || 'localhost',
+      type: serverType,
+      // 游戏服务器需要的字段
+      host: serverConfig.host || '',
       port: serverConfig.port || 25565,
       username: serverConfig.username || '',
       version: serverConfig.version || false,
@@ -213,7 +218,8 @@ export class ConfigManager {
       modes: serverConfig.modes || {
         aiView: false,
         patrol: false,
-        autoChat: false
+        autoChat: false,
+        invincible: false
       },
       // 独立的自动喊话配置
       autoChat: serverConfig.autoChat || {

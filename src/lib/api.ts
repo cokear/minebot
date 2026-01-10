@@ -280,6 +280,7 @@ class ApiService {
     port?: number;
     username?: string;
     version?: string;
+    type?: 'minecraft' | 'panel';
   }): Promise<{ success: boolean; id: string; status: BotStatus }> {
     return this.request('/api/bots/add', {
       method: 'POST',

@@ -1,4 +1,5 @@
 import { BotInstance } from './BotInstance.js';
+import { PanelInstance } from './PanelInstance.js';
 
 /**
  * Manages multiple bot instances across different servers
@@ -26,18 +27,39 @@ export class BotPool {
     if (servers && servers.length > 0) {
       console.log(`正在加载 ${servers.length} 个已保存的服务器配置...`);
       for (const serverConfig of servers) {
-        // 只创建实例，不自动连接
-        const bot = new BotInstance(
-          serverConfig.id,
-          serverConfig,
-          this.aiService,
-          this.onLog.bind(this),
-          this.onStatusChange.bind(this),
-          this.configManager // 传递 configManager 以支持保存配置
-        );
-        this.bots.set(serverConfig.id, bot);
-        console.log(`已加载服务器: ${serverConfig.name || serverConfig.id}`);
+        // 根据类型创建不同的实例
+        const instance = this.createInstance(serverConfig);
+        this.bots.set(serverConfig.id, instance);
+        console.log(`已加载服务器: ${serverConfig.name || serverConfig.id} (${serverConfig.type || 'minecraft'})`);
       }
+    }
+  }
+
+  /**
+   * 根据配置类型创建实例
+   */
+  createInstance(serverConfig) {
+    const type = serverConfig.type || 'minecraft';
+
+    if (type === 'panel') {
+      // 纯面板服务器
+      return new PanelInstance(
+        serverConfig.id,
+        serverConfig,
+        this.onLog.bind(this),
+        this.onStatusChange.bind(this),
+        this.configManager
+      );
+    } else {
+      // 游戏服务器（默认）
+      return new BotInstance(
+        serverConfig.id,
+        serverConfig,
+        this.aiService,
+        this.onLog.bind(this),
+        this.onStatusChange.bind(this),
+        this.configManager
+      );
     }
   }
 
@@ -146,23 +168,16 @@ export class BotPool {
       return { id, status: existingBot.getStatus() };
     }
 
-    const bot = new BotInstance(
-      id,
-      serverConfig,
-      this.aiService,
-      this.onLog.bind(this),
-      this.onStatusChange.bind(this),
-      this.configManager // 传递 configManager 以支持保存配置
-    );
-
-    this.bots.set(id, bot);
+    // 使用 createInstance 根据类型创建实例
+    const instance = this.createInstance({ ...serverConfig, id });
+    this.bots.set(id, instance);
 
     try {
-      await bot.connect();
-      return { id, status: bot.getStatus() };
+      await instance.connect();
+      return { id, status: instance.getStatus() };
     } catch (error) {
-      // Bot will auto-reconnect
-      return { id, status: bot.getStatus(), error: error.message };
+      // Will auto-reconnect
+      return { id, status: instance.getStatus(), error: error.message };
     }
   }
 

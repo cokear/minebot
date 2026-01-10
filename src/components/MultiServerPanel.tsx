@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Server, Plus, Trash2, Power, PowerOff, RefreshCw, Loader2, Pencil, X, Check, Terminal, ChevronDown, Trash } from "lucide-react";
+import { Server, Plus, Trash2, Power, PowerOff, RefreshCw, Loader2, Pencil, X, Check, Terminal, ChevronDown, Trash, MonitorCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,7 @@ interface LogEntry {
 interface ServerConfig {
   id: string;
   name: string;
+  type?: "minecraft" | "panel";  // 服务器类型
   host: string;
   port: number;
   username?: string;
@@ -38,6 +39,7 @@ interface ServerConfig {
     mining?: boolean;
     aiView?: boolean;
     autoChat?: boolean;
+    invincible?: boolean;
   };
   restartTimer?: {
     enabled: boolean;
@@ -54,6 +56,14 @@ interface ServerConfig {
     apiKey: string;
     serverId: string;
   } | null;
+  // 纯面板服务器的状态
+  panelServerState?: string;
+  panelServerStats?: {
+    cpuPercent: number;
+    memoryBytes: number;
+    diskBytes: number;
+    uptime: number;
+  };
 }
 
 export function MultiServerPanel() {
@@ -61,6 +71,7 @@ export function MultiServerPanel() {
   const [loading, setLoading] = useState(false);
   const [addingServer, setAddingServer] = useState(false);
   const [newServer, setNewServer] = useState({
+    type: "minecraft" as "minecraft" | "panel",
     name: "",
     host: "",
     port: "25565",
@@ -137,21 +148,27 @@ export function MultiServerPanel() {
   }, [openLogs]);
 
   const handleAddServer = async () => {
-    if (!newServer.host) {
+    // 游戏服务器需要 host，面板服务器需要名称
+    if (newServer.type === "minecraft" && !newServer.host) {
       toast({ title: "错误", description: "请输入服务器地址", variant: "destructive" });
+      return;
+    }
+    if (newServer.type === "panel" && !newServer.name) {
+      toast({ title: "错误", description: "请输入服务器名称", variant: "destructive" });
       return;
     }
 
     setLoading(true);
     try {
       await api.addServer({
+        type: newServer.type,
         name: newServer.name || `Server ${Object.keys(servers).length + 1}`,
-        host: newServer.host,
-        port: parseInt(newServer.port) || 25565,
-        username: newServer.username || undefined,
+        host: newServer.type === "minecraft" ? newServer.host : "",
+        port: newServer.type === "minecraft" ? (parseInt(newServer.port) || 25565) : 0,
+        username: newServer.type === "minecraft" ? (newServer.username || undefined) : undefined,
       });
-      toast({ title: "成功", description: "服务器已添加并开始连接" });
-      setNewServer({ name: "", host: "", port: "25565", username: "" });
+      toast({ title: "成功", description: newServer.type === "panel" ? "面板服务器已添加" : "服务器已添加并开始连接" });
+      setNewServer({ type: "minecraft", name: "", host: "", port: "25565", username: "" });
       setAddingServer(false);
       fetchServers();
     } catch (error) {
@@ -375,29 +392,73 @@ export function MultiServerPanel() {
                       <div className="flex items-center gap-3">
                         <div
                           className={`w-2 h-2 rounded-full ${
-                            server.connected ? "bg-green-500" : "bg-gray-400"
+                            server.connected ? "bg-green-500" :
+                            server.type === "panel" && server.panelServerState === "running" ? "bg-green-500" :
+                            "bg-gray-400"
                           }`}
                         />
                         <div>
-                          <div className="font-medium">{server.serverName || server.name || server.id}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {server.serverAddress || `${server.host}:${server.port}`}
-                            {server.username && ` (${server.username})`}
+                          <div className="font-medium flex items-center gap-2">
+                            {server.serverName || server.name || server.id}
+                            {server.type === "panel" && (
+                              <Badge variant="secondary" className="text-xs">面板</Badge>
+                            )}
                           </div>
-                          {/* 显示坐标和生命值 */}
-                          {server.connected && server.position && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              📍 X:{Math.floor(server.position.x)} Y:{Math.floor(server.position.y)} Z:{Math.floor(server.position.z)}
-                              {server.health !== undefined && ` | ❤️ ${Math.floor(server.health)}/20`}
-                              {server.food !== undefined && ` | 🍖 ${Math.floor(server.food)}/20`}
+                          {server.type === "panel" ? (
+                            /* 纯面板服务器信息 */
+                            <div className="text-sm text-muted-foreground">
+                              {server.panelServerState ? (
+                                <span className={
+                                  server.panelServerState === "running" ? "text-green-500" :
+                                  server.panelServerState === "starting" ? "text-yellow-500" :
+                                  server.panelServerState === "stopping" ? "text-yellow-500" :
+                                  "text-gray-400"
+                                }>
+                                  {server.panelServerState === "running" ? "运行中" :
+                                   server.panelServerState === "starting" ? "启动中" :
+                                   server.panelServerState === "stopping" ? "停止中" :
+                                   server.panelServerState === "offline" ? "已停止" :
+                                   server.panelServerState}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400">未连接面板</span>
+                              )}
+                              {server.panelServerStats && server.panelServerState === "running" && (
+                                <span className="ml-2">
+                                  | CPU: {server.panelServerStats.cpuPercent.toFixed(1)}%
+                                  | 内存: {(server.panelServerStats.memoryBytes / 1024 / 1024).toFixed(0)}MB
+                                </span>
+                              )}
                             </div>
+                          ) : (
+                            /* 游戏服务器信息 */
+                            <>
+                              <div className="text-sm text-muted-foreground">
+                                {server.serverAddress || `${server.host}:${server.port}`}
+                                {server.username && ` (${server.username})`}
+                              </div>
+                              {/* 显示坐标和生命值 */}
+                              {server.connected && server.position && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  X:{Math.floor(server.position.x)} Y:{Math.floor(server.position.y)} Z:{Math.floor(server.position.z)}
+                                  {server.health !== undefined && ` | ${Math.floor(server.health)}/20`}
+                                  {server.food !== undefined && ` | ${Math.floor(server.food)}/20`}
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={server.connected ? "default" : "outline"}>
-                          {server.connected ? "在线" : "离线"}
-                        </Badge>
+                        {server.type === "panel" ? (
+                          <Badge variant={server.panelServerState === "running" ? "default" : "outline"}>
+                            {server.panelServerState === "running" ? "运行中" : "已停止"}
+                          </Badge>
+                        ) : (
+                          <Badge variant={server.connected ? "default" : "outline"}>
+                            {server.connected ? "在线" : "离线"}
+                          </Badge>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -407,14 +468,17 @@ export function MultiServerPanel() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRestartServer(server.id)}
-                          disabled={loading}
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </Button>
+                        {server.type !== "panel" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRestartServer(server.id)}
+                            disabled={loading}
+                            title="重启连接"
+                          >
+                            <RefreshCw className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -432,6 +496,8 @@ export function MultiServerPanel() {
                       botId={server.id}
                       botName={server.username || server.name}
                       connected={server.connected || false}
+                      serverType={server.type || "minecraft"}
+                      panelServerState={server.panelServerState}
                       modes={server.modes}
                       players={server.players}
                       restartTimer={server.restartTimer}
@@ -506,42 +572,85 @@ export function MultiServerPanel() {
         {/* Add Server Form */}
         {addingServer ? (
           <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>名称</Label>
-                <Input
-                  placeholder="我的服务器"
-                  value={newServer.name}
-                  onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>用户名 (留空随机)</Label>
-                <Input
-                  placeholder="自动生成"
-                  value={newServer.username}
-                  onChange={(e) => setNewServer({ ...newServer, username: e.target.value })}
-                />
-              </div>
+            {/* 类型选择 */}
+            <div className="flex gap-2">
+              <Button
+                variant={newServer.type === "minecraft" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setNewServer({ ...newServer, type: "minecraft" })}
+                className="flex-1"
+              >
+                <Server className="h-4 w-4 mr-1" />
+                游戏服务器
+              </Button>
+              <Button
+                variant={newServer.type === "panel" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setNewServer({ ...newServer, type: "panel" })}
+                className="flex-1"
+              >
+                <MonitorCog className="h-4 w-4 mr-1" />
+                纯面板服务器
+              </Button>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2 space-y-1">
-                <Label>服务器地址 *</Label>
-                <Input
-                  placeholder="mc.example.com"
-                  value={newServer.host}
-                  onChange={(e) => setNewServer({ ...newServer, host: e.target.value })}
-                />
+
+            {newServer.type === "panel" ? (
+              /* 纯面板服务器表单 */
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>服务器名称 *</Label>
+                  <Input
+                    placeholder="我的面板服务器"
+                    value={newServer.name}
+                    onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  纯面板服务器不需要 Minecraft 连接，只通过翼龙面板 API 控制。添加后请在设置中配置面板信息。
+                </p>
               </div>
-              <div className="space-y-1">
-                <Label>端口</Label>
-                <Input
-                  placeholder="25565"
-                  value={newServer.port}
-                  onChange={(e) => setNewServer({ ...newServer, port: e.target.value })}
-                />
-              </div>
-            </div>
+            ) : (
+              /* 游戏服务器表单 */
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>名称</Label>
+                    <Input
+                      placeholder="我的服务器"
+                      value={newServer.name}
+                      onChange={(e) => setNewServer({ ...newServer, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>用户名 (留空随机)</Label>
+                    <Input
+                      placeholder="自动生成"
+                      value={newServer.username}
+                      onChange={(e) => setNewServer({ ...newServer, username: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2 space-y-1">
+                    <Label>服务器地址 *</Label>
+                    <Input
+                      placeholder="mc.example.com"
+                      value={newServer.host}
+                      onChange={(e) => setNewServer({ ...newServer, host: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>端口</Label>
+                    <Input
+                      placeholder="25565"
+                      value={newServer.port}
+                      onChange={(e) => setNewServer({ ...newServer, port: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="flex gap-2 justify-end">
               <Button
                 variant="outline"
@@ -552,7 +661,7 @@ export function MultiServerPanel() {
               </Button>
               <Button onClick={handleAddServer} disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                添加并连接
+                {newServer.type === "panel" ? "添加面板服务器" : "添加并连接"}
               </Button>
             </div>
           </div>

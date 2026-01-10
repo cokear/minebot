@@ -54,6 +54,8 @@ interface BotControlPanelProps {
   botId: string;
   botName: string;
   connected: boolean;
+  serverType?: "minecraft" | "panel";  // 服务器类型
+  panelServerState?: string;  // 面板服务器状态
   modes?: {
     follow?: boolean;
     autoAttack?: boolean;
@@ -86,6 +88,8 @@ export function BotControlPanel({
   botId,
   botName,
   connected,
+  serverType = "minecraft",
+  panelServerState,
   modes = {},
   players = [],
   restartTimer,
@@ -318,6 +322,104 @@ export function BotControlPanel({
   // 设置按钮始终可见（用于翼龙面板开机等功能）
   // 其他功能按钮只在连接后显示
 
+  // 纯面板服务器：只显示电源控制
+  if (serverType === "panel") {
+    return (
+      <div className="space-y-2 mt-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* 电源控制按钮 */}
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => handlePowerSignal('start')}
+            disabled={loading?.startsWith('power-') || !pterodactyl?.url}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {loading === "power-start" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Power className="h-4 w-4 mr-1" />}
+            <span className="text-xs">开机</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => handlePowerSignal('stop')}
+            disabled={loading?.startsWith('power-') || !pterodactyl?.url}
+            className="bg-yellow-600 hover:bg-yellow-700"
+          >
+            {loading === "power-stop" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <PowerOff className="h-4 w-4 mr-1" />}
+            <span className="text-xs">关机</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => handlePowerSignal('restart')}
+            disabled={loading?.startsWith('power-') || !pterodactyl?.url}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {loading === "power-restart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
+            <span className="text-xs">重启</span>
+          </Button>
+          {/* 设置按钮 */}
+          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" title="面板设置" onClick={handleOpenSettings}>
+                <Settings className="h-4 w-4 mr-1" />
+                <span className="text-xs">设置</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>面板服务器设置</DialogTitle>
+                <DialogDescription>配置翼龙面板连接信息</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>面板地址</Label>
+                  <Input
+                    value={panelUrl}
+                    onChange={(e) => setPanelUrl(e.target.value)}
+                    placeholder="https://panel.example.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>API Key</Label>
+                  <Input
+                    type="password"
+                    value={panelApiKey}
+                    onChange={(e) => setPanelApiKey(e.target.value)}
+                    placeholder="ptlc_..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>服务器 ID</Label>
+                  <Input
+                    value={panelServerId}
+                    onChange={(e) => setPanelServerId(e.target.value)}
+                    placeholder="abc12345"
+                  />
+                </div>
+                <Button
+                  onClick={handleSavePterodactyl}
+                  disabled={loading === "pterodactyl"}
+                  className="w-full"
+                >
+                  {loading === "pterodactyl" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  保存面板配置
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  保存后点击电源按钮即可控制服务器。API Key 需要在翼龙面板的 Account → API Credentials 中创建。
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        {!pterodactyl?.url && (
+          <p className="text-xs text-muted-foreground">请先在设置中配置翼龙面板信息</p>
+        )}
+      </div>
+    );
+  }
+
+  // 游戏服务器：显示完整控制面板
   return (
     <div className="space-y-2 mt-2">
       {/* 快捷操作栏 */}
