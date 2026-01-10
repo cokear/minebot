@@ -1,0 +1,395 @@
+curl --max-time 10 "https://panel.cloud
+" \   -H "Authorization: Bearer ptlc_RcS3m44JRWkZ36Xh7e3PfjRZ4fPRLj0eBdj5sQ24M3C"
+>     -H "Accept: application/json"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Security Check</title>
+  <style>
+    :root{--color-bg:#0a0a0a;--color-text:#ffffff;--color-text-muted:#888;--color-circle:#333}*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--color-bg);color:var(--color-text);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden}.background-blobs{position:absolute;inset:0;filter:blur(100px);opacity:.5;z-index:0}.blob{position:absolute;border-radius:50%;background:var(--color-circle)}.blob-1{width:30vmax;height:30vmax;animation:w1 25s infinite alternate ease-in-out}.blob-2{width:35vmax;height:35vmax;animation:w2 30s infinite alternate-reverse ease-in-out}.blob-3{width:25vmax;height:25vmax;animation:w3 35s infinite alternate ease-in-out}@keyframes w1{0%{transform:translate(-30vw,-40vh) scale(1)}100%{transform:translate(40vw,30vh) scale(1.3)}}@keyframes w2{0%{transform:translate(40vw,30vh) scale(1)}100%{transform:translate(-30vw,-40vh) scale(.9)}}@keyframes w3{0%{transform:translate(0,0) scale(.9)}100%{transform:translate(-20vw,20vh) scale(1.2)}}main{position:relative;z-index:1;text-align:center;transform:translateY(-40px);padding:1.5rem}h1{font-size:clamp(2rem,8vw,6rem);margin-bottom:1rem}p{color:var(--color-text-muted);font-size:1rem;min-height:1.5em}footer{position:fixed;bottom:0;width:100%;text-align:center;padding:1rem;z-index:2}footer a{color:var(--color-text-muted);text-decoration:none;font-size:.875rem}
+  </style>
+</head>
+<body>
+<div class="background-blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+<main>
+  <h1>DDoS Protection</h1>
+  <!-- Начальный текст устанавливается сразу в HTML -->
+  <p id="sub-heading">We are checking your connection, please wait</p>
+</main>
+<footer>
+  <a href="https://cloudblaze.org/" target="_blank" rel="noopener noreferrer">Powered by BlazeProtect</a>
+</footer>
+<script>
+  (function(){'use strict';
+    var C={sid:'c2d09c20434c5e10c9f0dbf7dea7770f',dif:1,non:'18476308edd21dd0',ts:1767940919};
+    var S={tm:0,oe:0,tp:0,ltx:-1,lty:-1,ltt:0,start:performance.now()};
+    var sub=document.getElementById('sub-heading');
+    
+    // Определяем язык и устанавливаем начальный текст с анимацией
+    var baseText=navigator.language.startsWith('ru')?
+      'Проверяем ваше соединение, пожалуйста, подождите':
+      'We are checking your connection, please wait';
+    
+    // Обновляем текст сразу после загрузки, если он отличается от HTML
+    sub.textContent = baseText;
+    
+    var dots=0;
+    var animInterval = setInterval(function(){
+      dots=(dots%3)+1;
+      sub.textContent=baseText+'.'.repeat(dots);
+    },600);
+    
+    var isMobile='ontouchstart'in window||navigator.maxTouchPoints>0;
+    
+    document.addEventListener('touchmove',function(e){
+      var t=e.touches[0];
+      var n=performance.now();
+      if(S.ltx!==-1){
+        var dx=t.clientX-S.ltx;
+        var dy=t.clientY-S.lty;
+        var d=Math.sqrt(dx*dx+dy*dy);
+        var dt=n-S.ltt;
+        if(d>2){
+          S.tm++;
+          if(dt>0&&d/dt>5)S.tp++;
+        }
+      }
+      S.ltx=t.clientX;
+      S.lty=t.clientY;
+      S.ltt=n;
+    },{passive:true});
+    
+    if(window.DeviceOrientationEvent){
+      window.addEventListener('deviceorientation',function(){
+        S.oe++;
+      },{passive:true});
+    }
+    
+    function sha256(str){
+      return crypto.subtle.digest('SHA-256',new TextEncoder().encode(str))
+        .then(function(buf){
+          var arr=new Uint8Array(buf);
+          var hex='';
+          for(var i=0;i<arr.length;i++){
+            hex+=arr[i].toString(16).padStart(2,'0');
+          }
+          return hex;
+        });
+    }
+    
+    function pow(sid,nonce,difficulty){
+      var prefix='';
+      for(var i=0;i<difficulty;i++){prefix+='0';}
+      var n=0;
+      function tryNext(){
+        var input=sid+':'+nonce+':'+n;
+        return sha256(input).then(function(hash){
+          if(hash.substring(0,difficulty)===prefix){
+            return{hash:hash,nonce:n};
+          }
+          n++;
+          if(n%500===0){
+            return new Promise(function(resolve){
+              setTimeout(function(){resolve(tryNext());},0);
+            });
+          }
+          return tryNext();
+        });
+      }
+      return tryNext();
+    }
+    
+    function getCanvasFingerprint(){
+      try{
+        var canvas=document.createElement('canvas');
+        canvas.width=280;canvas.height=60;
+        var ctx=canvas.getContext('2d');
+        var gradient=ctx.createLinearGradient(0,0,280,0);
+        gradient.addColorStop(0,'#ff6600');
+        gradient.addColorStop(0.5,'#0066ff');
+        gradient.addColorStop(1,'#00ff66');
+        ctx.fillStyle=gradient;
+        ctx.fillRect(0,0,280,60);
+        ctx.shadowColor='rgba(0,0,0,0.5)';
+        ctx.shadowBlur=3;
+        ctx.shadowOffsetX=2;
+        ctx.shadowOffsetY=2;
+        ctx.font='18px Georgia, serif';
+        ctx.fillStyle='#ffffff';
+        ctx.fillText('BlazeProtect Canvas Test',10,35);
+        ctx.shadowBlur=0;
+        ctx.beginPath();
+        ctx.arc(250,30,20,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,0,0.7)';
+        ctx.fill();
+        var dataUrl=canvas.toDataURL('image/png');
+        var hash=0;
+        for(var i=0;i<dataUrl.length;i++){
+          var char=dataUrl.charCodeAt(i);
+          hash=((hash<<5)-hash)+char;
+          hash=hash&hash;
+        }
+        var hexHash=Math.abs(hash).toString(16);
+        while(hexHash.length<8){hexHash='0'+hexHash;}
+        return hexHash;
+      }catch(e){return'canvas_err';}
+    }
+    
+    function getWebGLInfo(){
+      try{
+        var canvas=document.createElement('canvas');
+        var gl=canvas.getContext('webgl')||canvas.getContext('experimental-webgl');
+        if(!gl){return{vendor:'no_webgl',renderer:'no_webgl'};}
+        var debugInfo=gl.getExtension('WEBGL_debug_renderer_info');
+        if(debugInfo){
+          var vendor=gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+          var renderer=gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          return{vendor:vendor||'unknown_vendor',renderer:renderer||'unknown_renderer'};
+        }
+        return{vendor:'no_debug_ext',renderer:'no_debug_ext'};
+      }catch(e){return{vendor:'webgl_error',renderer:'webgl_error'};}
+    }
+    
+    function colorTest(){
+      try{
+        var c=document.createElement('canvas');
+        c.width=16;c.height=16;
+        var ctx=c.getContext('2d');
+        ctx.fillStyle='rgb(255,0,0)';
+        ctx.fillRect(0,0,4,16);
+        ctx.fillStyle='rgb(0,255,0)';
+        ctx.fillRect(4,0,4,16);
+        ctx.fillStyle='rgb(0,0,255)';
+        ctx.fillRect(8,0,4,16);
+        ctx.fillStyle='rgb(255,255,0)';
+        ctx.fillRect(12,0,4,16);
+        var d=ctx.getImageData(0,0,16,16).data;
+        var r=d[0]===255&&d[1]===0&&d[2]===0;
+        var g=d[64]===0&&d[65]===255&&d[66]===0;
+        var b=d[128]===0&&d[129]===0&&d[130]===255;
+        var y=d[192]===255&&d[193]===255&&d[194]===0;
+        return r&&g&&b&&y;
+      }catch(e){return false;}
+    }
+    
+    function detectBot(){
+      var f={
+        wd:!!navigator.webdriver,
+        ph:!!(window.callPhantom||window._phantom),
+        nm:!!window.__nightmare,
+        se:!!(document.documentElement.getAttribute('webdriver')||window._Selenium_IDE_Recorder||window.__webdriver_evaluate),
+        pp:!!(navigator.webdriver||(window.chrome&&!window.chrome.runtime)||/HeadlessChrome/.test(navigator.userAgent)),
+        pw:!!(window._playwright||window.__playwright),
+        hl:!!(/HeadlessChrome/.test(navigator.userAgent)||navigator.plugins.length===0||!window.chrome||(window.chrome&&!window.chrome.runtime))
+      };
+      f.noChrome=navigator.userAgent.indexOf('Chrome')>-1&&!window.chrome;
+      f.badPlugins=navigator.userAgent.indexOf('Chrome')>-1&&navigator.plugins.length===0;
+      f.noLang=!navigator.languages||navigator.languages.length===0;
+      f.badPerms=false;
+      try{
+        if(navigator.permissions){
+          navigator.permissions.query({name:'notifications'}).then(function(r){
+            if(r.state==='prompt'&&navigator.userAgent.indexOf('HeadlessChrome')>-1){
+              f.badPerms=true;
+            }
+          });
+        }
+      }catch(e){}
+      return f;
+    }
+    
+    function getAudioFP(){
+      return new Promise(function(resolve){
+        try{
+          var AC=window.AudioContext||window.webkitAudioContext;
+          if(!AC){resolve('no_audio');return;}
+          var ctx=new AC();
+          var osc=ctx.createOscillator();
+          var ana=ctx.createAnalyser();
+          var gain=ctx.createGain();
+          var proc=ctx.createScriptProcessor(4096,1,1);
+          gain.gain.value=0;
+          osc.type='triangle';
+          osc.frequency.value=10000;
+          osc.connect(ana);
+          ana.connect(proc);
+          proc.connect(gain);
+          gain.connect(ctx.destination);
+          var done=false;
+          proc.onaudioprocess=function(e){
+            if(done)return;
+            done=true;
+            var data=e.inputBuffer.getChannelData(0);
+            var hash=0;
+            for(var i=0;i<data.length;i+=100){
+              hash=((hash<<5)-hash)+Math.floor(data[i]*10000);
+              hash=hash&hash;
+            }
+            osc.stop();
+            ctx.close();
+            resolve(Math.abs(hash).toString(16));
+          };
+          osc.start(0);
+          setTimeout(function(){
+            if(!done){
+              done=true;
+              osc.stop();
+              ctx.close();
+              resolve('timeout');
+            }
+          },500);
+        }catch(e){resolve('error');}
+      });
+    }
+    
+    function getFonts(){
+      var base=['monospace','sans-serif','serif'];
+      var test=['Arial','Helvetica','Times','Courier','Verdana','Georgia','Comic Sans MS','Impact'];
+      var str='mmmmmmmmmmlli';
+      var span=document.createElement('span');
+      span.style.position='absolute';
+      span.style.left='-9999px';
+      span.style.fontSize='72px';
+      span.innerHTML=str;
+      var widths={};
+      for(var i=0;i<base.length;i++){
+        span.style.fontFamily=base[i];
+        document.body.appendChild(span);
+        widths[base[i]]=span.offsetWidth;
+        document.body.removeChild(span);
+      }
+      var detected=[];
+      for(var j=0;j<test.length;j++){
+        for(var k=0;k<base.length;k++){
+          span.style.fontFamily='"'+test[j]+'",'+base[k];
+          document.body.appendChild(span);
+          if(span.offsetWidth!==widths[base[k]]){
+            detected.push(test[j]);
+            document.body.removeChild(span);
+            break;
+          }
+          document.body.removeChild(span);
+        }
+      }
+      var hash=0;
+      var s=detected.join(',');
+      for(var l=0;l<s.length;l++){
+        hash=((hash<<5)-hash)+s.charCodeAt(l);
+        hash=hash&hash;
+      }
+      return Math.abs(hash).toString(16);
+    }
+    
+    function main(){
+      setTimeout(function(){
+        Promise.all([pow(C.sid,C.non,C.dif),getAudioFP()]).then(function(results){
+          var result=results[0];
+          var audioFp=results[1];
+          var webgl=getWebGLInfo();
+          var elapsed=Math.round(performance.now()-S.start);
+          var canvasFp=getCanvasFingerprint();
+          var fontsFp=getFonts();
+          var ct=colorTest();
+          var bot=detectBot();
+          
+          var payload={
+            sid:C.sid,
+            pow:result.hash,
+            pn:String(result.nonce),
+            et:String(elapsed),
+            tm:String(S.tm),
+            oe:String(S.oe),
+            tp:String(S.tp),
+            sw:String(screen.width||window.innerWidth||0),
+            sh:String(screen.height||window.innerHeight||0),
+            aw:String(screen.availWidth||0),
+            ah:String(screen.availHeight||0),
+            cd:String(screen.colorDepth||0),
+            pr:String(window.devicePixelRatio||1),
+            cf:canvasFp,
+            af:audioFp,
+            ff:fontsFp,
+            wr:webgl.renderer,
+            wv:webgl.vendor,
+            pl:navigator.userAgentData?navigator.userAgentData.platform:(navigator.platform||''),
+            hc:String(navigator.hardwareConcurrency||0),
+            dm:String(navigator.deviceMemory||0),
+            mt:String(navigator.maxTouchPoints||0),
+            tz:Intl.DateTimeFormat().resolvedOptions().timeZone||'',
+            to:String(new Date().getTimezoneOffset()),
+            ln:navigator.languages?navigator.languages.join(','):(navigator.language||''),
+            ss:(function(){try{return!!window.sessionStorage;}catch(e){return false;}})()?"1":"0",
+            ls:(function(){try{return!!window.localStorage;}catch(e){return false;}})()?"1":"0",
+            id:!!window.indexedDB?"1":"0",
+            wg:!!(document.createElement('canvas').getContext('webgl'))?"1":"0",
+            ck:navigator.cookieEnabled?"1":"0",
+            dn:navigator.doNotTrack||'',
+            hp:navigator.plugins&&navigator.plugins.length>0?"1":"0",
+            pc:String(navigator.plugins?navigator.plugins.length:0),
+            cr:!!(window.chrome&&window.chrome.runtime)?"1":"0",
+            pm:!!navigator.permissions?"1":"0",
+            wd:bot.wd?"1":"0",
+            ph:bot.ph?"1":"0",
+            nm:bot.nm?"1":"0",
+            se:bot.se?"1":"0",
+            pp:bot.pp?"1":"0",
+            pw:bot.pw?"1":"0",
+            hl:bot.hl?"1":"0",
+            ct:ct?"1":"0",
+            nc:bot.noChrome?"1":"0",
+            bp:bot.badPlugins?"1":"0",
+            nl:bot.noLang?"1":"0",
+            mb:isMobile?"1":"0"
+          };
+          
+          // Исправленная fetch часть с credentials: 'include'
+          fetch('/__bp_verify',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(payload),
+            credentials:'include'  // Важно для cookies!
+          }).then(function(response){
+            if(response.ok){
+              // Даём время cookies сохраниться
+              setTimeout(function(){
+                location.reload();
+              }, 100);
+            }else{
+              setTimeout(function(){
+                location.reload();
+              }, 2000);
+            }
+          }).catch(function(){
+            setTimeout(function(){
+              location.reload();
+            }, 3000);
+          });
+        });
+      },300);
+    }
+    
+    if(navigator.webdriver){
+      location.href='about:blank';
+    }
+    
+    // Очищаем интервал анимации перед перезагрузкой
+    window.addEventListener('beforeunload', function() {
+      clearInterval(animInterval);
+    });
+    
+    if(document.readyState==='loading'){
+      document.addEventListener('DOMContentLoaded',main);
+    }else{
+      main();
+    }
+  })();
+</script>
+</body>
+</html>

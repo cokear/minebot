@@ -251,18 +251,18 @@ export class PanelInstance {
       uptime: data.resources?.uptime || 0
     };
 
-    // 如果面板显示服务器正在运行，使用 TCP ping 验证真实在线状态
-    if (data.current_state === 'running' && this.status.serverHost && this.status.serverPort) {
+    // 只要有地址就执行 TCP ping，不依赖面板状态
+    if (this.status.serverHost && this.status.serverPort) {
       const pingResult = await this.tcpPing(this.status.serverHost, this.status.serverPort);
       this.status.tcpOnline = pingResult.online;
       this.status.tcpLatency = pingResult.latency;
 
-      if (!pingResult.online) {
-        this.log('warning', `TCP 检测: 端口 ${this.status.serverPort} 无响应`, '⚠');
+      if (pingResult.online) {
+        this.log('info', `TCP 在线: ${this.status.serverHost}:${this.status.serverPort} (${pingResult.latency}ms)`, '✅');
       }
     } else {
-      // 服务器未运行，不进行 TCP ping
-      this.status.tcpOnline = false;
+      // 没有地址信息
+      this.status.tcpOnline = null;
       this.status.tcpLatency = null;
     }
 

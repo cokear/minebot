@@ -437,7 +437,7 @@ export function MultiServerPanel() {
                                 <span className="text-gray-400">未连接面板</span>
                               )}
                               {/* TCP ping 状态 */}
-                              {server.panelServerState === "running" && server.tcpOnline !== null && (
+                              {server.tcpOnline !== null && (
                                 <span className={`ml-2 ${server.tcpOnline ? "text-green-400" : "text-red-400"}`}>
                                   | TCP: {server.tcpOnline ? `在线 ${server.tcpLatency ? `(${server.tcpLatency}ms)` : ""}` : "离线"}
                                 </span>
