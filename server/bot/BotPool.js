@@ -31,6 +31,13 @@ export class BotPool {
         const instance = this.createInstance(serverConfig);
         this.bots.set(serverConfig.id, instance);
         console.log(`已加载服务器: ${serverConfig.name || serverConfig.id} (${serverConfig.type || 'minecraft'})`);
+
+        // 面板服务器自动连接（开始状态检查）
+        if (serverConfig.type === 'panel') {
+          instance.connect().catch(err => {
+            console.log(`面板服务器 ${serverConfig.name || serverConfig.id} 连接失败: ${err.message}`);
+          });
+        }
       }
     }
   }
@@ -137,9 +144,13 @@ export class BotPool {
       botList: Array.from(this.bots.values()).map(b => ({
         id: b.id,
         name: b.status.serverName,
+        type: b.status.type || 'minecraft',
         connected: b.status.connected,
         serverAddress: b.status.serverAddress,
-        username: b.status.username
+        username: b.status.username,
+        // 面板服务器状态
+        panelServerState: b.status.panelServerState || null,
+        panelServerStats: b.status.panelServerStats || null
       }))
     };
   }
