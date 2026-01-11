@@ -1,9 +1,10 @@
 import axios from 'axios';
 import net from 'net';
+import SftpClient from 'ssh2-sftp-client';
 
 /**
  * Panel-only server instance (no Minecraft bot)
- * Used for managing servers via Pterodactyl API only
+ * Used for managing servers via Pterodactyl API or SFTP
  */
 export class PanelInstance {
   constructor(id, config, onLog, onStatusChange, configManager = null) {
@@ -27,6 +28,8 @@ export class PanelInstance {
       connected: false, // 面板是否可访问
       serverName: config.name || `Panel ${id}`,
       pterodactyl: config.pterodactyl || null,
+      sftp: config.sftp || null, // SFTP 配置
+      fileAccessType: config.fileAccessType || 'pterodactyl', // 文件访问方式
       panelServerState: null, // 'running', 'starting', 'stopping', 'offline'
       panelServerStats: null, // CPU, memory usage etc.
       // 服务器地址信息（从面板获取）
@@ -36,6 +39,10 @@ export class PanelInstance {
       tcpOnline: null, // true/false/null(未检测)
       tcpLatency: null // 延迟毫秒
     };
+
+    // 为 API 兼容性添加空的 modes 和 autoChatConfig
+    this.modes = {};
+    this.autoChatConfig = null;
   }
 
   log(type, message, icon = '') {
@@ -74,7 +81,9 @@ export class PanelInstance {
       name: this.config.name || this.status.serverName,
       modes: {},
       autoChat: null,
-      behaviors: null
+      behaviors: null,
+      sftp: this.status.sftp,
+      fileAccessType: this.status.fileAccessType
     };
   }
 
@@ -747,6 +756,345 @@ export class PanelInstance {
   setRestartTimer() { return {}; }
   sendRestartCommand() { return { success: false, message: '纯面板服务器不支持此操作' }; }
   updateAutoChatConfig() { return {}; }
+
+  // ==================== SFTP 配置与文件管理 ====================
+
+  /**
+   * 设置 SFTP 配置
+   */
+  setSftpConfig(config) {
+    this.status.sftp = {
+      host: config.host || '',
+      port: parseInt(config.port) || 22,
+      username: config.username || '',
+      password: config.password || '',
+      privateKey: config.privateKey || '',
+      basePath: config.basePath || '/'
+    };
+    this.log('info', 'SFTP 配置已更新', '🔑');
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    this.saveConfig();
+    return this.status.sftp;
+  }
+
+  /**
+   * 设置文件访问方式
+   * @param {string} type - 'pterodactyl' | 'sftp' | 'none'
+   */
+  setFileAccessType(type) {
+    const validTypes = ['pterodactyl', 'sftp', 'none'];
+    if (!validTypes.includes(type)) {
+      return { success: false, message: `无效的文件访问方式，可选: ${validTypes.join(', ')}` };
+    }
+    this.status.fileAccessType = type;
+    this.log('info', `文件访问方式已设置为: ${type}`, '📁');
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    this.saveConfig();
+    return { success: true, type };
+  }
+
+  /**
+   * 保存配置
+   */
+  saveConfig() {
+    if (!this.configManager) return;
+
+    try {
+      this.configManager.updateServer(this.id, {
+        pterodactyl: this.status.pterodactyl || {},
+        sftp: this.status.sftp || {},
+        fileAccessType: this.status.fileAccessType || 'pterodactyl'
+      });
+      this.log('info', '配置已保存', '💾');
+    } catch (error) {
+      this.log('warning', `保存配置失败: ${error.message}`, '⚠');
+    }
+  }
+
+  /**
+   * 获取 SFTP 客户端连接
+   */
+  async getSftpClient() {
+    const sftp = this.status.sftp;
+    if (!sftp || !sftp.host || !sftp.username) {
+      throw new Error('SFTP 未配置');
+    }
+
+    const client = new SftpClient();
+    const connectOptions = {
+      host: sftp.host,
+      port: sftp.port || 22,
+      username: sftp.username
+    };
+
+    if (sftp.privateKey) {
+      connectOptions.privateKey = sftp.privateKey;
+    } else if (sftp.password) {
+      connectOptions.password = sftp.password;
+    } else {
+      throw new Error('SFTP 需要密码或私钥');
+    }
+
+    await client.connect(connectOptions);
+    return client;
+  }
+
+  /**
+   * 获取 SFTP 完整路径
+   */
+  getSftpFullPath(relativePath) {
+    const basePath = this.status.sftp?.basePath || '/';
+    let fullPath = relativePath.startsWith('/') ? relativePath : `${basePath}/${relativePath}`;
+    fullPath = fullPath.replace(/\/+/g, '/');
+    return fullPath;
+  }
+
+  /**
+   * 通过 SFTP 列出目录文件
+   */
+  async listFilesSftp(directory = '/') {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(directory);
+      const list = await client.list(fullPath);
+
+      const files = list.map(item => ({
+        name: item.name,
+        mode: item.rights?.user || '',
+        size: item.size,
+        isFile: item.type === '-',
+        isSymlink: item.type === 'l',
+        isEditable: item.type === '-' && item.size < 10 * 1024 * 1024,
+        mimetype: this.getMimeType(item.name),
+        createdAt: item.accessTime ? new Date(item.accessTime).toISOString() : null,
+        modifiedAt: item.modifyTime ? new Date(item.modifyTime).toISOString() : null
+      }));
+
+      return { success: true, files, directory };
+    } catch (error) {
+      this.log('error', `SFTP 列出文件失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 获取文件内容
+   */
+  async getFileContentsSftp(file) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(file);
+      const content = await client.get(fullPath);
+
+      return { success: true, content: content.toString('utf-8'), file };
+    } catch (error) {
+      this.log('error', `SFTP 读取文件失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 写入文件内容
+   */
+  async writeFileSftp(file, content) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(file);
+      await client.put(Buffer.from(content, 'utf-8'), fullPath);
+
+      this.log('success', `SFTP 文件已保存: ${file}`, '💾');
+      return { success: true, message: '文件已保存' };
+    } catch (error) {
+      this.log('error', `SFTP 保存文件失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 创建文件夹
+   */
+  async createFolderSftp(root, name) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(`${root}/${name}`);
+      await client.mkdir(fullPath, true);
+
+      this.log('success', `SFTP 文件夹已创建: ${root}${name}`, '📁');
+      return { success: true, message: '文件夹已创建' };
+    } catch (error) {
+      this.log('error', `SFTP 创建文件夹失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 删除文件/文件夹
+   */
+  async deleteFilesSftp(root, files) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      let deletedCount = 0;
+
+      for (const fileName of files) {
+        const fullPath = this.getSftpFullPath(`${root}/${fileName}`);
+        try {
+          const stat = await client.stat(fullPath);
+          if (stat.isDirectory) {
+            await client.rmdir(fullPath, true);
+          } else {
+            await client.delete(fullPath);
+          }
+          deletedCount++;
+        } catch (e) {
+          this.log('warning', `删除 ${fileName} 失败: ${e.message}`, '⚠');
+        }
+      }
+
+      this.log('success', `SFTP 已删除 ${deletedCount} 个文件`, '🗑️');
+      return { success: true, message: `已删除 ${deletedCount} 个文件` };
+    } catch (error) {
+      this.log('error', `SFTP 删除文件失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 重命名文件/文件夹
+   */
+  async renameFileSftp(root, from, to) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fromPath = this.getSftpFullPath(`${root}/${from}`);
+      const toPath = this.getSftpFullPath(`${root}/${to}`);
+      await client.rename(fromPath, toPath);
+
+      this.log('success', `SFTP 已重命名: ${from} -> ${to}`, '✏️');
+      return { success: true, message: '重命名成功' };
+    } catch (error) {
+      this.log('error', `SFTP 重命名失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 复制文件
+   */
+  async copyFileSftp(location) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(location);
+
+      const lastSlash = location.lastIndexOf('/');
+      const dir = location.substring(0, lastSlash + 1);
+      const fileName = location.substring(lastSlash + 1);
+      const ext = fileName.lastIndexOf('.');
+      const baseName = ext > 0 ? fileName.substring(0, ext) : fileName;
+      const extension = ext > 0 ? fileName.substring(ext) : '';
+      const copyName = `${baseName} copy${extension}`;
+      const copyPath = this.getSftpFullPath(`${dir}${copyName}`);
+
+      const content = await client.get(fullPath);
+      await client.put(content, copyPath);
+
+      this.log('success', `SFTP 已复制: ${location} -> ${copyName}`, '📋');
+      return { success: true, message: '复制成功' };
+    } catch (error) {
+      this.log('error', `SFTP 复制失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 获取 SFTP 文件下载
+   */
+  async getFileDownloadSftp(file) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(file);
+      const content = await client.get(fullPath);
+
+      return { success: true, content, file };
+    } catch (error) {
+      this.log('error', `SFTP 下载文件失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 通过 SFTP 上传文件
+   */
+  async uploadFileSftp(directory, fileName, content) {
+    let client;
+    try {
+      client = await this.getSftpClient();
+      const fullPath = this.getSftpFullPath(`${directory}/${fileName}`);
+      await client.put(content, fullPath);
+
+      this.log('success', `SFTP 文件已上传: ${fileName}`, '📤');
+      return { success: true, message: '文件已上传' };
+    } catch (error) {
+      this.log('error', `SFTP 上传文件失败: ${error.message}`, '❌');
+      return { success: false, error: error.message };
+    } finally {
+      if (client) await client.end();
+    }
+  }
+
+  /**
+   * 根据文件名获取 MIME 类型
+   */
+  getMimeType(fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const mimeTypes = {
+      txt: 'text/plain',
+      json: 'application/json',
+      yml: 'text/yaml',
+      yaml: 'text/yaml',
+      properties: 'text/x-java-properties',
+      cfg: 'text/plain',
+      conf: 'text/plain',
+      ini: 'text/plain',
+      log: 'text/plain',
+      xml: 'application/xml',
+      html: 'text/html',
+      css: 'text/css',
+      js: 'application/javascript',
+      jar: 'application/java-archive',
+      zip: 'application/zip',
+      gz: 'application/gzip',
+      tar: 'application/x-tar',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      ico: 'image/x-icon'
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+  }
 
   /**
    * 清理资源
