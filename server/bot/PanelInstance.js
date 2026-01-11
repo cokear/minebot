@@ -180,8 +180,8 @@ export class PanelInstance {
       clearInterval(this.statusCheckInterval);
     }
 
-    // 每 30 秒检查一次状态
-    this.statusCheckInterval = setInterval(async () => {
+    // 定义检查函数
+    const doCheck = async () => {
       try {
         if (this.isPanelConfigured()) {
           // 有翼龙面板配置，获取完整状态
@@ -202,7 +202,13 @@ export class PanelInstance {
         }
         this.log('warning', `状态检查失败: ${error.message}${hint}`, '⚠');
       }
-    }, 30000);
+    };
+
+    // 立即执行第一次检查
+    doCheck();
+
+    // 每 30 秒检查一次状态
+    this.statusCheckInterval = setInterval(doCheck, 30000);
   }
 
   /**
@@ -1063,7 +1069,6 @@ export class PanelInstance {
       this.log('info', `SFTP 列出目录: ${fullPath}`, '📂');
 
       const list = await client.list(fullPath);
-      console.log('[SFTP Debug] list result:', JSON.stringify(list, null, 2));
       this.log('info', `SFTP 找到 ${list.length} 个文件`, '📂');
 
       const files = list.map(item => ({
