@@ -547,9 +547,8 @@ export class BotInstance {
       }
 
       if (this.modes.invincible) {
-        // 使用创造模式实现真正无敌
-        this.bot.chat(`/gamemode creative ${this.bot.username}`);
-        this.log('info', '无敌模式已恢复 (创造模式)', '🛡️');
+        // 使用面板控制台发送创造模式命令（确保有权限）
+        this.applyInvincibleMode();
       }
 
       if (this.modes.autoChat) {
@@ -597,12 +596,9 @@ export class BotInstance {
       // 无敌模式 - 使用创造模式实现真正无敌
       if (mode === 'invincible' && this.bot) {
         if (enabled) {
-          this.bot.chat(`/gamemode creative ${this.bot.username}`);
-          this.log('info', '无敌模式已开启 (创造模式)', '🛡️');
+          this.applyInvincibleMode();
         } else {
-          // 切回生存模式
-          this.bot.chat(`/gamemode survival ${this.bot.username}`);
-          this.log('info', '无敌模式已关闭', '🛡️');
+          this.disableInvincibleMode();
         }
       }
       // 保存模式设置到配置
@@ -727,11 +723,56 @@ export class BotInstance {
       return;
     }
 
-    const result = await this.sendPanelCommand(`/op ${this.status.username}`);
+    const result = await this.sendPanelCommand(`op ${this.status.username}`);
     if (result.success) {
       this.hasAutoOpped = true;
       this.log('success', `已自动授予 OP 权限: ${this.status.username}`, '👑');
     }
+  }
+
+  /**
+   * 应用无敌模式 - 优先使用面板控制台，否则使用机器人聊天
+   */
+  async applyInvincibleMode() {
+    if (!this.bot || !this.status.username) return;
+
+    const username = this.status.username;
+
+    // 优先尝试通过面板控制台发送命令（有完整权限）
+    if (this.status.pterodactyl?.url && this.status.pterodactyl?.apiKey) {
+      const result = await this.sendPanelCommand(`gamemode creative ${username}`);
+      if (result.success) {
+        this.log('success', '无敌模式已开启 (创造模式 - 通过面板)', '🛡️');
+        return;
+      }
+      this.log('warning', '面板命令失败，尝试使用机器人命令...', '⚠');
+    }
+
+    // 回退：通过机器人聊天发送命令（需要OP权限）
+    this.bot.chat(`/gamemode creative ${username}`);
+    this.log('info', '无敌模式命令已发送 (创造模式)', '🛡️');
+  }
+
+  /**
+   * 关闭无敌模式
+   */
+  async disableInvincibleMode() {
+    if (!this.bot || !this.status.username) return;
+
+    const username = this.status.username;
+
+    // 优先尝试通过面板控制台发送命令
+    if (this.status.pterodactyl?.url && this.status.pterodactyl?.apiKey) {
+      const result = await this.sendPanelCommand(`gamemode survival ${username}`);
+      if (result.success) {
+        this.log('success', '无敌模式已关闭 (生存模式 - 通过面板)', '🛡️');
+        return;
+      }
+    }
+
+    // 回退：通过机器人聊天发送命令
+    this.bot.chat(`/gamemode survival ${username}`);
+    this.log('info', '无敌模式已关闭 (生存模式)', '🛡️');
   }
 
   /**
@@ -1287,13 +1328,13 @@ export class BotInstance {
     if (!this.bot) return;
 
     if (this.modes.invincible) {
-      this.bot.chat(`/gamemode survival ${this.bot.username}`);
+      this.disableInvincibleMode();
       this.modes.invincible = false;
-      this.bot.chat('无敌模式已关闭 (生存模式)');
+      this.bot.chat('无敌模式已关闭');
     } else {
-      this.bot.chat(`/gamemode creative ${this.bot.username}`);
+      this.applyInvincibleMode();
       this.modes.invincible = true;
-      this.bot.chat('无敌模式已开启 (创造模式)');
+      this.bot.chat('无敌模式已开启');
     }
     this.saveConfig();
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
