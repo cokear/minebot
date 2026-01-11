@@ -83,6 +83,15 @@ interface BotControlPanelProps {
     apiKey: string;
     serverId: string;
   } | null;
+  sftp?: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    privateKey: string;
+    basePath: string;
+  } | null;
+  fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
   onUpdate?: () => void;
 }
 
@@ -97,6 +106,8 @@ export function BotControlPanel({
   restartTimer,
   autoChat: autoChatProp,
   pterodactyl,
+  sftp: sftpProp,
+  fileAccessType: fileAccessTypeProp = 'pterodactyl',
   onUpdate
 }: BotControlPanelProps) {
   const [loading, setLoading] = useState<string | null>(null);
@@ -122,6 +133,14 @@ export function BotControlPanel({
   const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
 
+  // SFTP 配置状态
+  const [sftpHost, setSftpHost] = useState(sftpProp?.host || "");
+  const [sftpPort, setSftpPort] = useState<string>((sftpProp?.port || 22).toString());
+  const [sftpUsername, setSftpUsername] = useState(sftpProp?.username || "");
+  const [sftpPassword, setSftpPassword] = useState(sftpProp?.password || "");
+  const [sftpBasePath, setSftpBasePath] = useState(sftpProp?.basePath || "/");
+  const [fileAccessType, setFileAccessType] = useState<'pterodactyl' | 'sftp' | 'none'>(fileAccessTypeProp);
+
   // 打开设置对话框时获取最新配置
   const handleOpenSettings = async () => {
     setSettingsOpen(true);
@@ -137,6 +156,13 @@ export function BotControlPanel({
         setPanelUrl(cfg.pterodactyl?.url || "");
         setPanelApiKey(cfg.pterodactyl?.apiKey || "");
         setPanelServerId(cfg.pterodactyl?.serverId || "");
+        // SFTP 配置
+        setSftpHost(cfg.sftp?.host || "");
+        setSftpPort((cfg.sftp?.port || 22).toString());
+        setSftpUsername(cfg.sftp?.username || "");
+        setSftpPassword(cfg.sftp?.password || "");
+        setSftpBasePath(cfg.sftp?.basePath || "/");
+        setFileAccessType(cfg.fileAccessType || 'pterodactyl');
       }
     } catch (error) {
       console.error("Failed to load bot config:", error);
@@ -291,6 +317,41 @@ export function BotControlPanel({
     }
   };
 
+  // 保存 SFTP 设置
+  const handleSaveSftp = async () => {
+    setLoading("sftp");
+    try {
+      await api.setSftp(botId, {
+        host: sftpHost,
+        port: parseInt(sftpPort) || 22,
+        username: sftpUsername,
+        password: sftpPassword,
+        basePath: sftpBasePath
+      });
+      toast({ title: "SFTP 配置已保存" });
+      onUpdate?.();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // 保存文件访问方式
+  const handleSaveFileAccessType = async (type: 'pterodactyl' | 'sftp' | 'none') => {
+    setLoading("fileAccessType");
+    try {
+      await api.setFileAccessType(botId, type);
+      setFileAccessType(type);
+      toast({ title: "文件访问方式已设置", description: `当前模式: ${type === 'pterodactyl' ? '翼龙面板' : type === 'sftp' ? 'SFTP' : '禁用'}` });
+      onUpdate?.();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(null);
+    }
+  };
+
   // 自动OP
   const handleAutoOp = async () => {
     setLoading("autoOp");
@@ -368,7 +429,7 @@ export function BotControlPanel({
                 size="sm"
                 variant="outline"
                 title="文件管理"
-                disabled={!pterodactyl?.url}
+                disabled={!pterodactyl?.url && !(sftpProp?.host && fileAccessTypeProp === 'sftp')}
               >
                 <FolderOpen className="h-4 w-4 mr-1" />
                 <span className="text-xs">文件</span>
@@ -484,8 +545,8 @@ export function BotControlPanel({
             </Button>
           </>
         )}
-        {/* 文件管理按钮 - 需要翼龙面板配置 */}
-        {pterodactyl?.url && (
+        {/* 文件管理按钮 - 需要翼龙面板或 SFTP 配置 */}
+        {(pterodactyl?.url || (sftpProp?.host && fileAccessTypeProp === 'sftp')) && (
           <Dialog open={fileManagerOpen} onOpenChange={setFileManagerOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" title="文件管理">
@@ -516,10 +577,11 @@ export function BotControlPanel({
               <DialogDescription>配置此服务器的独立设置</DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="restart" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="restart">定时重启</TabsTrigger>
                 <TabsTrigger value="chat">自动喊话</TabsTrigger>
                 <TabsTrigger value="panel">翼龙面板</TabsTrigger>
+                <TabsTrigger value="sftp">SFTP</TabsTrigger>
               </TabsList>
 
               {/* 定时重启设置 */}
@@ -703,6 +765,102 @@ export function BotControlPanel({
                 <p className="text-xs text-muted-foreground">
                   电源控制直接操作翼龙面板服务器电源状态。控制台命令发送到服务器控制台。
                 </p>
+              </TabsContent>
+
+              {/* SFTP 设置 */}
+              <TabsContent value="sftp" className="space-y-4">
+                {/* 文件访问方式选择 */}
+                <div className="space-y-2">
+                  <Label>文件访问方式</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={fileAccessType === 'pterodactyl' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleSaveFileAccessType('pterodactyl')}
+                      disabled={loading === 'fileAccessType'}
+                    >
+                      翼龙面板
+                    </Button>
+                    <Button
+                      variant={fileAccessType === 'sftp' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleSaveFileAccessType('sftp')}
+                      disabled={loading === 'fileAccessType'}
+                    >
+                      SFTP
+                    </Button>
+                    <Button
+                      variant={fileAccessType === 'none' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleSaveFileAccessType('none')}
+                      disabled={loading === 'fileAccessType'}
+                    >
+                      禁用
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    当前模式: {fileAccessType === 'pterodactyl' ? '翼龙面板' : fileAccessType === 'sftp' ? 'SFTP 直连' : '禁用'}
+                  </p>
+                </div>
+
+                <div className="border-t pt-4 space-y-4">
+                  <Label className="text-sm font-medium">SFTP 连接配置</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">主机地址</Label>
+                      <Input
+                        value={sftpHost}
+                        onChange={(e) => setSftpHost(e.target.value)}
+                        placeholder="192.168.1.100"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">端口</Label>
+                      <Input
+                        type="number"
+                        value={sftpPort}
+                        onChange={(e) => setSftpPort(e.target.value)}
+                        placeholder="22"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">用户名</Label>
+                    <Input
+                      value={sftpUsername}
+                      onChange={(e) => setSftpUsername(e.target.value)}
+                      placeholder="root"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">密码</Label>
+                    <Input
+                      type="password"
+                      value={sftpPassword}
+                      onChange={(e) => setSftpPassword(e.target.value)}
+                      placeholder="SSH 密码"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">基础路径</Label>
+                    <Input
+                      value={sftpBasePath}
+                      onChange={(e) => setSftpBasePath(e.target.value)}
+                      placeholder="/ 或 /home/minecraft"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSaveSftp}
+                    disabled={loading === "sftp"}
+                    className="w-full"
+                  >
+                    {loading === "sftp" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    保存 SFTP 配置
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    配置 SSH/SFTP 连接信息以直接访问服务器文件。基础路径用于限制可访问的目录范围。
+                  </p>
+                </div>
               </TabsContent>
             </Tabs>
           </DialogContent>

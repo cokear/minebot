@@ -239,6 +239,17 @@ export class ConfigManager {
         apiKey: '',
         serverId: ''
       },
+      // 独立的 SFTP 配置
+      sftp: serverConfig.sftp || {
+        host: '',
+        port: 22,
+        username: '',
+        password: '',
+        privateKey: '',
+        basePath: '/'
+      },
+      // 文件访问方式: 'pterodactyl' | 'sftp' | 'none'
+      fileAccessType: serverConfig.fileAccessType || 'pterodactyl',
       // 是否自动OP
       autoOp: serverConfig.autoOp !== false
     };
@@ -263,7 +274,8 @@ export class ConfigManager {
       modes: { ...current.modes, ...(updates.modes || {}) },
       autoChat: { ...current.autoChat, ...(updates.autoChat || {}) },
       restartTimer: { ...current.restartTimer, ...(updates.restartTimer || {}) },
-      pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) }
+      pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
+      sftp: { ...current.sftp, ...(updates.sftp || {}) }
     };
     this.saveConfig();
     return this.config.servers[index];

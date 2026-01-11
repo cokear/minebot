@@ -56,6 +56,15 @@ interface ServerConfig {
     apiKey: string;
     serverId: string;
   } | null;
+  sftp?: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    privateKey: string;
+    basePath: string;
+  } | null;
+  fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
   // 纯面板服务器的状态
   panelServerState?: string;
   panelServerStats?: {
@@ -533,6 +542,8 @@ export function MultiServerPanel() {
                       restartTimer={server.restartTimer}
                       autoChat={server.autoChat}
                       pterodactyl={server.pterodactyl}
+                      sftp={server.sftp}
+                      fileAccessType={server.fileAccessType}
                       onUpdate={fetchServers}
                     />
 

@@ -548,6 +548,35 @@ app.post('/api/bots/:id/pterodactyl', (req, res) => {
   }
 });
 
+// Set SFTP config for a bot
+app.post('/api/bots/:id/sftp', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = bot.setSftpConfig(req.body);
+    res.json({ success: true, sftp: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Set file access type for a bot
+app.post('/api/bots/:id/file-access-type', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { type } = req.body;
+    const result = bot.setFileAccessType(type);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Send console command via Pterodactyl panel
 app.post('/api/bots/:id/panel-command', async (req, res) => {
   try {
@@ -664,6 +693,8 @@ app.get('/api/bots/:id/config', (req, res) => {
         autoChat: bot.autoChatConfig,
         restartTimer: bot.status.restartTimer,
         pterodactyl: bot.status.pterodactyl,
+        sftp: bot.status.sftp,
+        fileAccessType: bot.status.fileAccessType,
         autoOp: bot.status.autoOp
       }
     });
@@ -793,7 +824,14 @@ app.get('/api/bots/:id/files', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
     const directory = req.query.directory || '/';
-    const result = await bot.listFiles(directory);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.listFilesSftp(directory);
+    } else {
+      result = await bot.listFiles(directory);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -811,7 +849,14 @@ app.get('/api/bots/:id/files/contents', async (req, res) => {
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
     }
-    const result = await bot.getFileContents(file);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.getFileContentsSftp(file);
+    } else {
+      result = await bot.getFileContents(file);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -829,14 +874,21 @@ app.post('/api/bots/:id/files/write', express.text({ limit: '50mb' }), async (re
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
     }
-    const result = await bot.writeFile(file, req.body);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.writeFileSftp(file, req.body);
+    } else {
+      result = await bot.writeFile(file, req.body);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 });
 
-// 获取下载链接
+// 获取下载链接 (pterodactyl) 或直接下载文件 (sftp)
 app.get('/api/bots/:id/files/download', async (req, res) => {
   try {
     const bot = botManager.bots.get(req.params.id);
@@ -847,21 +899,67 @@ app.get('/api/bots/:id/files/download', async (req, res) => {
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
     }
-    const result = await bot.getDownloadUrl(file);
-    res.json(result);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    if (fileAccessType === 'sftp') {
+      // SFTP 模式：直接返回文件内容
+      const result = await bot.getFileDownloadSftp(file);
+      if (!result.success) {
+        return res.status(400).json(result);
+      }
+      // 设置下载头
+      const fileName = file.split('/').pop();
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+      res.send(result.content);
+    } else {
+      // Pterodactyl 模式：返回下载 URL
+      const result = await bot.getDownloadUrl(file);
+      res.json(result);
+    }
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 });
 
-// 获取上传链接
+// 获取上传链接 (pterodactyl) 或返回上传端点信息 (sftp)
 app.get('/api/bots/:id/files/upload', async (req, res) => {
   try {
     const bot = botManager.bots.get(req.params.id);
     if (!bot) {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
-    const result = await bot.getUploadUrl();
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    if (fileAccessType === 'sftp') {
+      // SFTP 模式：返回上传端点信息
+      res.json({
+        success: true,
+        type: 'sftp',
+        endpoint: `/api/bots/${req.params.id}/files/upload-sftp`
+      });
+    } else {
+      const result = await bot.getUploadUrl();
+      res.json(result);
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// SFTP 文件上传端点
+app.post('/api/bots/:id/files/upload-sftp', express.raw({ limit: '100mb', type: '*/*' }), async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const directory = req.query.directory || '/';
+    const fileName = req.query.name;
+    if (!fileName) {
+      return res.status(400).json({ success: false, error: '缺少 name 参数' });
+    }
+    const result = await bot.uploadFileSftp(directory, fileName, req.body);
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -879,7 +977,14 @@ app.post('/api/bots/:id/files/folder', async (req, res) => {
     if (!name) {
       return res.status(400).json({ success: false, error: '缺少 name 参数' });
     }
-    const result = await bot.createFolder(root || '/', name);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.createFolderSftp(root || '/', name);
+    } else {
+      result = await bot.createFolder(root || '/', name);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -897,7 +1002,14 @@ app.post('/api/bots/:id/files/delete', async (req, res) => {
     if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ success: false, error: '缺少 files 参数' });
     }
-    const result = await bot.deleteFiles(root || '/', files);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.deleteFilesSftp(root || '/', files);
+    } else {
+      result = await bot.deleteFiles(root || '/', files);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -915,7 +1027,14 @@ app.post('/api/bots/:id/files/rename', async (req, res) => {
     if (!from || !to) {
       return res.status(400).json({ success: false, error: '缺少 from 或 to 参数' });
     }
-    const result = await bot.renameFile(root || '/', from, to);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.renameFileSftp(root || '/', from, to);
+    } else {
+      result = await bot.renameFile(root || '/', from, to);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
@@ -933,14 +1052,21 @@ app.post('/api/bots/:id/files/copy', async (req, res) => {
     if (!location) {
       return res.status(400).json({ success: false, error: '缺少 location 参数' });
     }
-    const result = await bot.copyFile(location);
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    let result;
+    if (fileAccessType === 'sftp') {
+      result = await bot.copyFileSftp(location);
+    } else {
+      result = await bot.copyFile(location);
+    }
     res.json(result);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 });
 
-// 压缩文件
+// 压缩文件 (仅 pterodactyl 支持)
 app.post('/api/bots/:id/files/compress', async (req, res) => {
   try {
     const bot = botManager.bots.get(req.params.id);
@@ -951,6 +1077,11 @@ app.post('/api/bots/:id/files/compress', async (req, res) => {
     if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ success: false, error: '缺少 files 参数' });
     }
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    if (fileAccessType === 'sftp') {
+      return res.status(400).json({ success: false, error: 'SFTP 模式不支持压缩功能' });
+    }
     const result = await bot.compressFiles(root || '/', files);
     res.json(result);
   } catch (error) {
@@ -958,7 +1089,7 @@ app.post('/api/bots/:id/files/compress', async (req, res) => {
   }
 });
 
-// 解压文件
+// 解压文件 (仅 pterodactyl 支持)
 app.post('/api/bots/:id/files/decompress', async (req, res) => {
   try {
     const bot = botManager.bots.get(req.params.id);
@@ -968,6 +1099,11 @@ app.post('/api/bots/:id/files/decompress', async (req, res) => {
     const { root, file } = req.body;
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
+
+    if (fileAccessType === 'sftp') {
+      return res.status(400).json({ success: false, error: 'SFTP 模式不支持解压功能' });
     }
     const result = await bot.decompressFile(root || '/', file);
     res.json(result);

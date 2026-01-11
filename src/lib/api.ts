@@ -390,6 +390,22 @@ class ApiService {
     });
   }
 
+  // SFTP config
+  async setSftp(id: string, config: { host: string; port: number; username: string; password?: string; privateKey?: string; basePath?: string }): Promise<{ success: boolean; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } }> {
+    return this.request(`/api/bots/${id}/sftp`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  // File access type
+  async setFileAccessType(id: string, type: 'pterodactyl' | 'sftp' | 'none'): Promise<{ success: boolean; type: string }> {
+    return this.request(`/api/bots/${id}/file-access-type`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    });
+  }
+
   // Send console command via panel
   async sendPanelCommand(id: string, command: string): Promise<{ success: boolean; message: string }> {
     return this.request(`/api/bots/${id}/panel-command`, {
@@ -424,7 +440,7 @@ class ApiService {
   }
 
   // Get bot config
-  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string } | null; autoOp: boolean } }> {
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean } }> {
     return this.request(`/api/bots/${id}/config`);
   }
 
