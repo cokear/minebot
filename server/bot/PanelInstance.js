@@ -106,30 +106,41 @@ export class PanelInstance {
    * 连接到面板（开始状态检查）
    */
   async connect() {
-    if (!this.isPanelConfigured()) {
-      this.log('warning', '翼龙面板未配置', '⚠');
+    // 检查是否有任何可用的配置（翼龙面板或手动IP/端口）
+    const hasPanelConfig = this.isPanelConfigured();
+    const hasManualConfig = this.config.host && this.config.port;
+
+    if (!hasPanelConfig && !hasManualConfig) {
+      this.log('warning', '未配置翼龙面板或服务器地址', '⚠');
       return;
     }
 
-    this.log('info', '正在连接翼龙面板...', '🔌');
+    if (hasPanelConfig) {
+      this.log('info', '正在连接翼龙面板...', '🔌');
 
-    try {
-      // 先获取服务器分配的地址
-      await this.fetchServerAllocation();
-      // 再获取服务器状态
-      await this.fetchServerStatus();
-      this.status.connected = true;
-      this.log('success', '面板连接成功', '✅');
-
-      // 开始定期检查状态
-      this.startStatusCheck();
-
-      if (this.onStatusChange) {
-        this.onStatusChange(this.id, this.getStatus());
+      try {
+        // 先获取服务器分配的地址
+        await this.fetchServerAllocation();
+        // 再获取服务器状态
+        await this.fetchServerStatus();
+        this.status.connected = true;
+        this.log('success', '面板连接成功', '✅');
+      } catch (error) {
+        this.log('error', `面板连接失败: ${error.message}`, '❌');
+        this.status.connected = false;
       }
-    } catch (error) {
-      this.log('error', `面板连接失败: ${error.message}`, '❌');
-      this.status.connected = false;
+    } else {
+      // 只有手动配置，执行一次 TCP ping
+      this.log('info', `检测服务器 ${this.config.host}:${this.config.port}...`, '🔌');
+      await this.doTcpPingOnly();
+      this.status.connected = true; // 标记为已连接（已开始监控）
+    }
+
+    // 开始定期检查状态
+    this.startStatusCheck();
+
+    if (this.onStatusChange) {
+      this.onStatusChange(this.id, this.getStatus());
     }
   }
 
@@ -159,11 +170,41 @@ export class PanelInstance {
     // 每 30 秒检查一次状态
     this.statusCheckInterval = setInterval(async () => {
       try {
-        await this.fetchServerStatus();
+        if (this.isPanelConfigured()) {
+          // 有翼龙面板配置，获取完整状态
+          await this.fetchServerStatus();
+        } else {
+          // 没有翼龙面板，只做 TCP ping
+          await this.doTcpPingOnly();
+        }
       } catch (error) {
         this.log('warning', `状态检查失败: ${error.message}`, '⚠');
       }
     }, 30000);
+  }
+
+  /**
+   * 只执行 TCP ping（没有翼龙面板配置时使用）
+   */
+  async doTcpPingOnly() {
+    const pingHost = this.config.host;
+    const pingPort = this.config.port;
+
+    if (pingHost && pingPort) {
+      const pingResult = await this.tcpPing(pingHost, pingPort);
+      this.status.tcpOnline = pingResult.online;
+      this.status.tcpLatency = pingResult.latency;
+
+      if (pingResult.online) {
+        this.log('info', `TCP 在线: ${pingHost}:${pingPort} (${pingResult.latency}ms)`, '✅');
+      } else {
+        this.log('warning', `TCP 离线: ${pingHost}:${pingPort}`, '❌');
+      }
+
+      if (this.onStatusChange) {
+        this.onStatusChange(this.id, this.getStatus());
+      }
+    }
   }
 
   /**
@@ -267,14 +308,18 @@ export class PanelInstance {
       uptime: data.resources?.uptime || 0
     };
 
+    // 优先使用用户配置的 IP/端口，否则使用从面板获取的
+    const pingHost = this.config.host || this.status.serverHost;
+    const pingPort = this.config.port || this.status.serverPort;
+
     // 只要有地址就执行 TCP ping，不依赖面板状态
-    if (this.status.serverHost && this.status.serverPort) {
-      const pingResult = await this.tcpPing(this.status.serverHost, this.status.serverPort);
+    if (pingHost && pingPort) {
+      const pingResult = await this.tcpPing(pingHost, pingPort);
       this.status.tcpOnline = pingResult.online;
       this.status.tcpLatency = pingResult.latency;
 
       if (pingResult.online) {
-        this.log('info', `TCP 在线: ${this.status.serverHost}:${this.status.serverPort} (${pingResult.latency}ms)`, '✅');
+        this.log('info', `TCP 在线: ${pingHost}:${pingPort} (${pingResult.latency}ms)`, '✅');
       }
     } else {
       // 没有地址信息
