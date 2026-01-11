@@ -130,7 +130,16 @@ export class PanelInstance {
         this.status.connected = true;
         this.log('success', '面板连接成功', '✅');
       } catch (error) {
-        this.log('error', `面板连接失败: ${error.message}`, '❌');
+        const status = error.response?.status;
+        let hint = '';
+        if (status === 403) {
+          hint = ' (API Key 无效或权限不足，请检查 API Key)';
+        } else if (status === 401) {
+          hint = ' (未授权，请检查 API Key)';
+        } else if (status === 404) {
+          hint = ' (服务器ID不存在，请检查配置)';
+        }
+        this.log('error', `面板连接失败: ${error.message}${hint}`, '❌');
         this.status.connected = false;
       }
     } else {
@@ -182,7 +191,16 @@ export class PanelInstance {
           await this.doTcpPingOnly();
         }
       } catch (error) {
-        this.log('warning', `状态检查失败: ${error.message}`, '⚠');
+        const status = error.response?.status;
+        let hint = '';
+        if (status === 403) {
+          hint = ' (API Key 无效或权限不足)';
+        } else if (status === 401) {
+          hint = ' (未授权)';
+        } else if (status === 404) {
+          hint = ' (服务器ID不存在)';
+        }
+        this.log('warning', `状态检查失败: ${error.message}${hint}`, '⚠');
       }
     }, 30000);
   }
