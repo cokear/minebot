@@ -962,10 +962,25 @@ export class PanelInstance {
       throw new Error('SFTP 未配置');
     }
 
+    // 解析 host，支持 host:port 格式
+    let host = sftp.host;
+    let port = sftp.port || 22;
+
+    if (host.includes(':')) {
+      const parts = host.split(':');
+      host = parts[0];
+      const parsedPort = parseInt(parts[1]);
+      if (!isNaN(parsedPort)) {
+        port = parsedPort;
+      }
+    }
+
+    this.log('info', `SFTP 连接: ${host}:${port}`, '🔌');
+
     const client = new SftpClient();
     const connectOptions = {
-      host: sftp.host,
-      port: sftp.port || 22,
+      host: host,
+      port: port,
       username: sftp.username,
       readyTimeout: 10000,
       retries: 2,
