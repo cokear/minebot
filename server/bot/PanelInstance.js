@@ -853,6 +853,9 @@ export class PanelInstance {
 
     try {
       this.configManager.updateServer(this.id, {
+        name: this.config.name,
+        host: this.config.host,
+        port: this.config.port,
         pterodactyl: this.status.pterodactyl || {},
         sftp: this.status.sftp || {},
         fileAccessType: this.status.fileAccessType || 'pterodactyl'
