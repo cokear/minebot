@@ -185,6 +185,11 @@ export class ConfigManager {
     return this.config.servers || [];
   }
 
+  getServer(id) {
+    const servers = this.config.servers || [];
+    return servers.find(s => s.id === id) || null;
+  }
+
   addServer(serverConfig) {
     if (!this.config.servers) {
       this.config.servers = [];
