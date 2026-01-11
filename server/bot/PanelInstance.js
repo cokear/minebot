@@ -319,15 +319,22 @@ export class PanelInstance {
 
       socket.on('timeout', () => {
         socket.destroy();
-        resolve({ online: false, latency: null });
+        console.log(`[TCP Ping] ${host}:${port} 超时 (${timeout}ms)`);
+        resolve({ online: false, latency: null, error: 'timeout' });
       });
 
-      socket.on('error', () => {
+      socket.on('error', (err) => {
         socket.destroy();
-        resolve({ online: false, latency: null });
+        console.log(`[TCP Ping] ${host}:${port} 错误: ${err.message}`);
+        resolve({ online: false, latency: null, error: err.message });
       });
 
-      socket.connect(port, host);
+      try {
+        socket.connect(port, host);
+      } catch (err) {
+        console.log(`[TCP Ping] ${host}:${port} 连接异常: ${err.message}`);
+        resolve({ online: false, latency: null, error: err.message });
+      }
     });
   }
 
