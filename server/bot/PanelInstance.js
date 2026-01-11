@@ -75,11 +75,16 @@ export class PanelInstance {
 
   getStatus() {
     const name = this.config.name || this.status.serverName;
+    // 优先使用配置中的 host/port，如果没有则使用从面板获取的
+    const host = this.config.host || this.status.serverHost || '';
+    const port = this.config.port || this.status.serverPort || 0;
     return {
       ...this.status,
       serverName: name, // 确保 serverName 与 name 一致
-      host: this.status.serverHost || '',
-      port: this.status.serverPort || 0,
+      serverHost: host, // 同步更新 serverHost
+      serverPort: port, // 同步更新 serverPort
+      host: host,
+      port: port,
       name: name,
       modes: {},
       autoChat: null,
