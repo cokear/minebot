@@ -215,6 +215,8 @@ export class BotInstance {
 
     this.reconnecting = true;
     this.status.connected = false;
+    // 重置活动时间，避免重连期间再次触发卡死检测
+    this.lastActivity = Date.now();
     this.log('warning', `连接${reason}，5秒后重连...`, '🔄');
 
     // 完全清理旧实例（与 disconnect 类似但不设置 destroyed）
@@ -415,17 +417,28 @@ export class BotInstance {
 
         this.bot.on('error', (err) => {
           this.log('error', `错误: ${err.message}`, '✗');
-          this.attemptRepair('错误');
+          // 如果正在重连或已销毁，不再触发重连
+          if (!this.reconnecting && !this.destroyed) {
+            this.attemptRepair('错误');
+          }
         });
 
         this.bot.on('kicked', (reason) => {
           this.log('error', `被踢出: ${reason}`, '👢');
           this.status.connected = false;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          this.attemptRepair('被踢');
+          // 如果正在重连或已销毁，不再触发重连
+          if (!this.reconnecting && !this.destroyed) {
+            this.attemptRepair('被踢');
+          }
         });
 
         this.bot.on('end', () => {
+          // 如果正在重连或已销毁，不再触发重连
+          if (this.reconnecting || this.destroyed) {
+            this.log('info', '连接已关闭', '🔌');
+            return;
+          }
           this.log('warning', '连接断开', '🔌');
           this.status.connected = false;
           this.bot = null;
