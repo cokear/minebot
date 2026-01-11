@@ -375,25 +375,46 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
 
     setUploading(true);
     try {
-      // 获取上传 URL
+      // 获取上传信息
       const result = await api.getUploadUrl(serverId);
-      if (!result.success || !result.url) {
-        throw new Error(result.error || "无法获取上传链接");
+      if (!result.success) {
+        throw new Error(result.error || "无法获取上传信息");
       }
 
       // 上传文件
       for (const file of Array.from(fileList)) {
-        const formData = new FormData();
-        formData.append("files", file);
+        if (result.type === 'sftp') {
+          // SFTP 模式：直接上传到后端
+          const uploadUrl = `${result.endpoint}?directory=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            headers: {
+              'Content-Type': 'application/octet-stream',
+            },
+            body: file,
+          });
 
-        const uploadUrl = `${result.url}&directory=${encodeURIComponent(currentPath)}`;
-        const response = await fetch(uploadUrl, {
-          method: "POST",
-          body: formData,
-        });
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `上传失败: ${response.statusText}`);
+          }
+        } else {
+          // 翼龙面板模式
+          if (!result.url) {
+            throw new Error("无法获取上传链接");
+          }
+          const formData = new FormData();
+          formData.append("files", file);
 
-        if (!response.ok) {
-          throw new Error(`上传失败: ${response.statusText}`);
+          const uploadUrl = `${result.url}&directory=${encodeURIComponent(currentPath)}`;
+          const response = await fetch(uploadUrl, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            throw new Error(`上传失败: ${response.statusText}`);
+          }
         }
       }
 
