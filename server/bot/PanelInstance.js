@@ -1041,6 +1041,7 @@ export class PanelInstance {
       this.log('info', `SFTP 列出目录: ${fullPath}`, '📂');
 
       const list = await client.list(fullPath);
+      this.log('info', `SFTP 找到 ${list.length} 个文件`, '📂');
 
       const files = list.map(item => ({
         name: item.name,
