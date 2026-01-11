@@ -1010,7 +1010,25 @@ export class PanelInstance {
     let client;
     try {
       client = await this.getSftpClient();
-      const fullPath = this.getSftpFullPath(directory);
+
+      // 获取当前工作目录，用于调试
+      let cwd = '.';
+      try {
+        cwd = await client.cwd();
+        this.log('info', `SFTP 当前目录: ${cwd}`, '📂');
+      } catch (e) {
+        // 某些服务器不支持 cwd
+      }
+
+      // 如果 basePath 未配置且 directory 是根目录，直接用 . 表示当前目录
+      let fullPath;
+      const basePath = this.status.sftp?.basePath;
+      if ((!basePath || basePath === '/') && (directory === '/' || directory === '')) {
+        fullPath = '.';
+      } else {
+        fullPath = this.getSftpFullPath(directory);
+      }
+
       this.log('info', `SFTP 列出目录: ${fullPath}`, '📂');
 
       const list = await client.list(fullPath);
