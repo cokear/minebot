@@ -748,8 +748,8 @@ export class BotInstance {
       this.log('warning', '面板命令失败，尝试使用机器人命令...', '⚠');
     }
 
-    // 回退：通过机器人聊天发送命令（需要OP权限）
-    this.bot.chat(`/gamemode creative ${username}`);
+    // 回退：通过机器人聊天发送命令（不需要指定玩家名）
+    this.bot.chat('/gamemode 1');
     this.log('info', '无敌模式命令已发送 (创造模式)', '🛡️');
   }
 
@@ -771,7 +771,7 @@ export class BotInstance {
     }
 
     // 回退：通过机器人聊天发送命令
-    this.bot.chat(`/gamemode survival ${username}`);
+    this.bot.chat('/gamemode 0');
     this.log('info', '无敌模式已关闭 (生存模式)', '🛡️');
   }
 
