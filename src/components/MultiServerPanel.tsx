@@ -146,7 +146,7 @@ export function MultiServerPanel() {
 
   useEffect(() => {
     fetchServers();
-    const interval = setInterval(fetchServers, 5000);
+    const interval = setInterval(fetchServers, 10000); // 10秒轮询一次
     return () => clearInterval(interval);
   }, []);
 
@@ -157,7 +157,7 @@ export function MultiServerPanel() {
 
     const interval = setInterval(() => {
       openBotIds.forEach(id => fetchBotLogs(id));
-    }, 3000);
+    }, 5000); // 5秒刷新一次日志
     return () => clearInterval(interval);
   }, [openLogs]);
 

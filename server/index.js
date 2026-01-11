@@ -317,9 +317,7 @@ app.get('/api/logs', (req, res) => {
 
 // Get all bots status
 app.get('/api/bots', (req, res) => {
-  const status = botManager.getAllStatus();
-  console.log('[GET /api/bots] 返回状态:', JSON.stringify(status, null, 2));
-  res.json(status);
+  res.json(botManager.getAllStatus());
 });
 
 // Add new server
@@ -359,8 +357,6 @@ app.put('/api/bots/:id', async (req, res) => {
     const { name, username, host, port } = req.body;
     const id = req.params.id;
 
-    console.log(`[PUT /api/bots/${id}] 收到更新请求:`, { name, username, host, port });
-
     // Validate username format if provided
     if (username !== undefined && username !== '') {
       const usernameRegex = /^[a-zA-Z0-9_]{3,16}$/;
@@ -379,36 +375,27 @@ app.put('/api/bots/:id', async (req, res) => {
     if (host !== undefined) updates.host = host;
     if (port !== undefined) updates.port = parseInt(port) || 25565;
 
-    console.log(`[PUT /api/bots/${id}] 更新配置:`, updates);
-
     const updatedConfig = configManager.updateServer(id, updates);
-    console.log(`[PUT /api/bots/${id}] 配置已更新:`, updatedConfig);
 
     // Update in bot manager
     const bot = botManager.bots.get(id);
     if (bot) {
-      console.log(`[PUT /api/bots/${id}] 更新 bot 实例`);
       if (name !== undefined) {
         bot.status.serverName = name;
         bot.config.name = name;
       }
       if (username !== undefined) {
         bot.config.username = username;
-        // 只有未连接时才更新 status.username，连接后会自动设置
         if (!bot.status.connected) {
           bot.status.username = username;
         }
       }
       if (host !== undefined) bot.config.host = host;
       if (port !== undefined) bot.config.port = parseInt(port) || 25565;
-      console.log(`[PUT /api/bots/${id}] bot.config 更新后:`, { name: bot.config.name, username: bot.config.username });
-    } else {
-      console.log(`[PUT /api/bots/${id}] 警告: bot 实例不存在`);
     }
 
     res.json({ success: true, config: updatedConfig });
   } catch (error) {
-    console.error(`[PUT /api/bots/${id}] 错误:`, error);
     res.status(400).json({ success: false, error: error.message });
   }
 });

@@ -156,7 +156,7 @@ export function RenewalPanel() {
   useEffect(() => {
     if (showLogs || testingId) {
       fetchGlobalLogs();
-      const interval = setInterval(fetchGlobalLogs, 1000);
+      const interval = setInterval(fetchGlobalLogs, 3000); // 3秒刷新一次
       return () => clearInterval(interval);
     }
   }, [showLogs, testingId]);
@@ -165,7 +165,7 @@ export function RenewalPanel() {
   useEffect(() => {
     if (expandedId) {
       fetchRenewalLogs(expandedId);
-      const interval = setInterval(() => fetchRenewalLogs(expandedId), 2000);
+      const interval = setInterval(() => fetchRenewalLogs(expandedId), 5000); // 5秒刷新一次
       return () => clearInterval(interval);
     }
   }, [expandedId]);
