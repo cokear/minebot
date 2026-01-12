@@ -5165,7 +5165,7 @@ const HTML = `<!DOCTYPE html>
         score++;
       }
 
-      if (!/[!@#$%^&*_\-+=\[\]{};:'",.<>?/\\|`~]/.test(password)) {
+      if (!/[!@#$%^&*_\-+=\[\]{};:'".,<>?\/\\|~]/.test(password)) {
         reasons.push('特殊字符 (!@#$%^&*)');
       } else {
         score++;
