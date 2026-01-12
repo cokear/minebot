@@ -3996,6 +3996,12 @@ const HTML = `<!DOCTYPE html>
       border-bottom: 2px solid rgba(94, 234, 212, 0.1);
       padding-bottom: 0;
       overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .tabs::-webkit-scrollbar {
+      display: none;
     }
 
     .tab {
