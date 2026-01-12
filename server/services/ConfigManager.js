@@ -1,12 +1,100 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CONFIG_FILE = path.join(__dirname, '../data/config.json');
 const CREDENTIALS_FILE = path.join(__dirname, '../data/credentials.json');
+
+// ============================================================================
+// 加密工具函数 (Encryption Infrastructure)
+// ============================================================================
+
+/**
+ * 使用 PBKDF2 从主密码生成加密密钥
+ * @param {string} masterPassword - 主密码
+ * @param {Buffer} salt - 盐值 (如果为null则生成新盐)
+ * @returns {{key: Buffer, salt: Buffer}} - 派生密钥和盐值
+ */
+function generateMasterKey(masterPassword, salt = null) {
+  if (!salt) {
+    salt = crypto.randomBytes(16);
+  }
+
+  const key = crypto.pbkdf2Sync(masterPassword, salt, 100000, 32, 'sha256');
+  return { key, salt };
+}
+
+/**
+ * 使用 AES-256-GCM 加密配置数据
+ * @param {object} data - 要加密的配置对象
+ * @param {Buffer} masterKey - 加密密钥
+ * @returns {{iv: string, ciphertext: string, authTag: string}} - 加密数据 (Base64编码)
+ */
+function encryptConfig(data, masterKey) {
+  const iv = crypto.randomBytes(12); // 96-bit IV for GCM
+  const cipher = crypto.createCipheriv('aes-256-gcm', masterKey, iv);
+
+  const plaintext = JSON.stringify(data);
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, 'utf8'),
+    cipher.final()
+  ]);
+
+  const authTag = cipher.getAuthTag();
+
+  return {
+    iv: iv.toString('base64'),
+    ciphertext: encrypted.toString('base64'),
+    authTag: authTag.toString('base64')
+  };
+}
+
+/**
+ * 使用 AES-256-GCM 解密配置数据
+ * @param {{iv: string, ciphertext: string, authTag: string}} encrypted - 加密数据 (Base64编码)
+ * @param {Buffer} masterKey - 解密密钥
+ * @returns {object} - 原始配置对象
+ */
+function decryptConfig(encrypted, masterKey) {
+  try {
+    const iv = Buffer.from(encrypted.iv, 'base64');
+    const ciphertext = Buffer.from(encrypted.ciphertext, 'base64');
+    const authTag = Buffer.from(encrypted.authTag, 'base64');
+
+    const decipher = crypto.createDecipheriv('aes-256-gcm', masterKey, iv);
+    decipher.setAuthTag(authTag);
+
+    const decrypted = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final()
+    ]);
+
+    return JSON.parse(decrypted.toString('utf8'));
+  } catch (error) {
+    throw new Error(`Failed to decrypt config: ${error.message}`);
+  }
+}
+
+/**
+ * 获取 Master Password (从环境变量)
+ * @returns {string|null}
+ */
+function getMasterPassword() {
+  return process.env.MASTER_PASSWORD || null;
+}
+
+/**
+ * 检查配置文件是否加密
+ * @param {object} config - 配置对象
+ * @returns {boolean}
+ */
+function isEncryptedConfig(config) {
+  return config && config.encrypted === true && config.version === '2.0';
+}
 
 export class ConfigManager {
   constructor() {
@@ -24,10 +112,35 @@ export class ConfigManager {
   loadConfig() {
     try {
       if (fs.existsSync(CONFIG_FILE)) {
-        return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+        const rawConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+
+        // 检查是否是加密配置
+        if (isEncryptedConfig(rawConfig)) {
+          const masterPassword = getMasterPassword();
+          if (!masterPassword) {
+            throw new Error('Config is encrypted but MASTER_PASSWORD is not set in environment');
+          }
+
+          // 派生密钥用于解密
+          const salt = Buffer.from(rawConfig.salt, 'base64');
+          const { key } = generateMasterKey(masterPassword, salt);
+
+          // 解密配置
+          const decrypted = decryptConfig(rawConfig.data, key);
+          return decrypted;
+        }
+
+        // 检查是否需要迁移到加密格式
+        if (rawConfig && !rawConfig.encrypted) {
+          console.warn('⚠️  Detected unencrypted config.json. It will be encrypted on next save.');
+          console.warn('   Set MASTER_PASSWORD environment variable to enable encryption.');
+          return rawConfig;
+        }
+
+        return rawConfig;
       }
     } catch (error) {
-      console.error('Error loading config:', error);
+      console.error('❌ Error loading config:', error.message);
     }
     return this.getDefaultConfig();
   }
@@ -139,9 +252,29 @@ export class ConfigManager {
   saveConfig() {
     try {
       this.ensureDataDir();
-      fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
+      const masterPassword = getMasterPassword();
+
+      if (masterPassword) {
+        // 加密配置
+        const { key, salt } = generateMasterKey(masterPassword);
+        const encrypted = encryptConfig(this.config, key);
+
+        const encryptedConfig = {
+          encrypted: true,
+          version: '2.0',
+          salt: salt.toString('base64'),
+          data: encrypted
+        };
+
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(encryptedConfig, null, 2));
+        console.log('✅ Config saved (encrypted with AES-256-GCM)');
+      } else {
+        // 明文保存 (不推荐用于生产环境)
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
+        console.warn('⚠️  Config saved in plaintext. Set MASTER_PASSWORD to enable encryption.');
+      }
     } catch (error) {
-      console.error('Error saving config:', error);
+      console.error('❌ Error saving config:', error.message);
       throw error;
     }
   }
@@ -319,5 +452,57 @@ export class ConfigManager {
     this.config.servers = reordered;
     this.saveConfig();
     return true;
+  }
+
+  /**
+   * 迁移配置文件到加密格式
+   * @returns {boolean} - 是否成功迁移
+   */
+  migrateToEncrypted() {
+    const masterPassword = getMasterPassword();
+
+    if (!masterPassword) {
+      console.warn('⚠️  Cannot migrate: MASTER_PASSWORD not set');
+      return false;
+    }
+
+    // 检查是否已经加密
+    if (isEncryptedConfig(this.config)) {
+      console.log('ℹ️  Config is already encrypted');
+      return true;
+    }
+
+    try {
+      // 备份原始配置
+      const backupFile = CONFIG_FILE + '.bak';
+      if (!fs.existsSync(backupFile)) {
+        fs.copyFileSync(CONFIG_FILE, backupFile);
+        console.log(`✅ Backup created: ${backupFile}`);
+      }
+
+      // 加密并保存
+      this.saveConfig();
+      console.log('✅ Config successfully migrated to encrypted format');
+      return true;
+    } catch (error) {
+      console.error('❌ Migration failed:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 获取加密状态
+   * @returns {boolean} - 是否已加密
+   */
+  isConfigEncrypted() {
+    try {
+      if (fs.existsSync(CONFIG_FILE)) {
+        const rawConfig = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+        return isEncryptedConfig(rawConfig);
+      }
+    } catch (error) {
+      // Silently fail
+    }
+    return false;
   }
 }
