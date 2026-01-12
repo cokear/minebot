@@ -53,15 +53,37 @@ app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: '请输入用户名和密码' });
+    return res.status(400).json({ error: 'Username and password required' });
   }
 
-  if (authService.validateCredentials(username, password)) {
+  // Get client IP for rate limiting
+  const clientIp = req.ip || req.connection.remoteAddress || '0.0.0.0';
+
+  // Validate credentials (now includes rate limiting)
+  const result = authService.validateCredentials(username, password, clientIp);
+
+  if (result.valid) {
     const token = authService.generateToken(username);
-    res.json({ success: true, token, username });
-  } else {
-    res.status(401).json({ error: '用户名或密码错误' });
+    return res.json({
+      success: true,
+      token,
+      expiresIn: 86400, // 24 hours in seconds
+      user: { username }
+    });
   }
+
+  // Handle rate limiting and authentication errors
+  if (result.rateLimited) {
+    return res.status(429).json({
+      error: result.message,
+      code: 'RATE_LIMITED'
+    });
+  }
+
+  res.status(401).json({
+    error: result.message || 'Invalid username or password',
+    code: 'INVALID_AUTH'
+  });
 });
 
 app.get('/api/auth/check', (req, res) => {
@@ -74,10 +96,52 @@ app.get('/api/auth/check', (req, res) => {
   const decoded = authService.verifyToken(token);
 
   if (decoded) {
-    res.json({ authenticated: true, username: decoded.username });
+    res.json({
+      authenticated: true,
+      user: { username: decoded.username }
+    });
   } else {
     res.json({ authenticated: false });
   }
+});
+
+// Password management endpoints (require authentication)
+app.post('/api/auth/change-password', (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ error: 'New passwords do not match' });
+  }
+
+  const clientIp = req.ip || req.connection.remoteAddress || '0.0.0.0';
+  const currentUser = req.user.username;
+
+  // Verify current password
+  const verifyResult = authService.validateCredentials(currentUser, currentPassword, clientIp);
+  if (!verifyResult.valid) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  // Update password
+  const updateResult = authService.updateCredentials(currentUser, newPassword);
+  if (!updateResult.success) {
+    return res.status(400).json({ error: updateResult.message });
+  }
+
+  res.json({
+    success: true,
+    message: 'Password changed successfully. Please login again.'
+  });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  // JWT logout is handled on client side by removing the token
+  // But we can track logout if needed
+  res.json({ success: true, message: 'Logged out successfully' });
 });
 
 // Apply auth middleware to all /api routes except auth
