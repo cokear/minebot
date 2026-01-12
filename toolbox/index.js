@@ -3989,9 +3989,40 @@ const HTML = `<!DOCTYPE html>
     .subtitle { text-align: center; color: var(--muted); margin-bottom: 30px; font-size: 14px; }
 
     /* Tabs */
-    .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
-    .tab { padding: 10px 20px; background: transparent; border: none; color: var(--muted); cursor: pointer; border-radius: 6px 6px 0 0; }
-    .tab.active { background: var(--card); color: var(--text); }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 2px solid rgba(94, 234, 212, 0.1);
+      padding-bottom: 0;
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 12px 20px;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 0;
+      position: relative;
+      font-weight: 500;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .tab:hover {
+      color: var(--primary);
+      background: rgba(94, 234, 212, 0.05);
+    }
+
+    .tab.active {
+      background: transparent;
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      margin-bottom: -2px;
+    }
+
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
@@ -4048,8 +4079,22 @@ const HTML = `<!DOCTYPE html>
       opacity: 1;
     }
 
-    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-    .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .card-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+
+    /* 类型徽章 */
+    .server-type-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: rgba(94, 234, 212, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(94, 234, 212, 0.3);
+    }
 
     /* 卡片内容间距优化 */
     .card > div:not(.card-header):not(.card::before) {
@@ -4158,39 +4203,58 @@ const HTML = `<!DOCTYPE html>
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 
     /* Server card */
-    .server-card { cursor: pointer; transition: border-color 0.2s; }
-    .server-card:hover { border-color: var(--primary); }
+    .server-card {
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .server-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+    }
 
     .server-info {
       font-size: 13px;
       color: var(--muted);
-      margin-top: 12px;
+      margin-top: 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
+      flex-grow: 1;
     }
 
     .server-info code {
-      background: rgba(15, 23, 42, 0.8);
-      padding: 6px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      border-left: 2px solid var(--primary);
-      display: block;
-      word-break: break-all;
+      display: none;
     }
 
     .server-info-stats {
       display: flex;
-      gap: 12px;
-      font-size: 12px;
+      gap: 16px;
+      font-size: 13px;
       flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .server-info-stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .server-info-stat-value {
+      font-weight: 600;
+      color: var(--text);
+      min-width: 24px;
     }
 
     .server-info-modes {
-      font-size: 11px;
-      letter-spacing: 2px;
+      font-size: 16px;
+      letter-spacing: 4px;
       color: var(--primary);
+      opacity: 0.8;
     }
 
     /* Modal */
@@ -4417,12 +4481,17 @@ const HTML = `<!DOCTYPE html>
                   <span class="dot \${b.connected ? 'online' : 'offline'}"></span>
                   \${b.name || b.id}
                 </div>
-                <span style="font-size:12px;color:var(--muted)">\${b.type === 'panel' ? '${_d('6Z2i5p2/')}' : '${_d('5py65Zmo5Lq6')}'}</span>
+                <span class="server-type-badge">\${b.type === 'panel' ? '${_d('6Z2i5p2/')}' : '${_d('5py65Zmo5Lq6')}'}</span>
               </div>
               <div class="server-info">
-                <code>\${b.host || '${_d('5pyq6YWN572u')}'}:\${b.port || 25565}</code>
-                \${b.connected ? \`<br>❤️ \${b.health||0} 🍖 \${b.food||0} 👥 \${(b.players||[]).length}\` : ''}
-                \${b.modes ? \`<br><span style="font-size:11px">\${Object.entries(b.modes).filter(([k,v])=>v).map(([k])=>({aiView:'👁️',patrol:'🚶',autoAttack:'⚔️',invincible:'🛡️',autoChat:'💬',mining:'⛏️'}[k]||'')).join(' ')}</span>\` : ''}
+                \${b.connected ? \`
+                  <div class="server-info-stats">
+                    <div class="server-info-stat"><span>❤️</span><span class="server-info-stat-value">\${b.health||0}</span></div>
+                    <div class="server-info-stat"><span>🍖</span><span class="server-info-stat-value">\${b.food||0}</span></div>
+                    <div class="server-info-stat"><span>👥</span><span class="server-info-stat-value">\${(b.players||[]).length}</span></div>
+                  </div>
+                \` : '<div style="color:var(--danger);font-weight:500">未连接</div>'}
+                \${b.modes ? \`<div class="server-info-modes">\${Object.entries(b.modes).filter(([k,v])=>v).map(([k])=>({aiView:'👁️',patrol:'🚶',autoAttack:'⚔️',invincible:'🛡️',autoChat:'💬',mining:'⛏️'}[k]||'')).join(' ')}</div>\` : ''}
               </div>
             </div>
           \`).join('') || '<p style="color:var(--muted)">${_d('5pqC5peg5pyN5Yqh5Zmo77yM54K55Ye75LiK5pa55oyJ6ZKu5re75Yqg')}</p>'}
