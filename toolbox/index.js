@@ -4232,22 +4232,33 @@ const HTML = `<!DOCTYPE html>
 
     .server-info-stats {
       display: flex;
-      gap: 16px;
+      gap: 20px;
       font-size: 13px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: center;
+      justify-content: flex-start;
+      background: rgba(94, 234, 212, 0.05);
+      padding: 10px 12px;
+      border-radius: 8px;
+      border-left: 2px solid var(--primary);
     }
 
     .server-info-stat {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .server-info-stat span:first-child {
+      font-size: 16px;
     }
 
     .server-info-stat-value {
-      font-weight: 600;
-      color: var(--text);
-      min-width: 24px;
+      font-weight: 700;
+      color: var(--primary);
+      min-width: 20px;
+      text-align: center;
     }
 
     .server-info-modes {
