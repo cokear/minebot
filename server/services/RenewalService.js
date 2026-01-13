@@ -6,6 +6,7 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import proxyChain from 'proxy-chain';
+import os from 'os';
 
 // 使用 stealth 插件绑过检测
 puppeteer.use(StealthPlugin());
@@ -261,13 +262,18 @@ export class RenewalService {
    * ARM64 Linux 使用系统安装的 Chromium，AMD64 使用 Puppeteer 自带的 Chrome
    */
   getChromePath() {
-    const os = require('os');
+    // 首先检查环境变量（优先级最高）
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      this.log('info', `使用环境变量指定的浏览器: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
+      return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+
     const arch = os.arch();
     const platform = os.platform();
 
     // ARM64 Linux: 使用系统 Chromium（因为 Puppeteer 的 Chrome 不支持 ARM Linux）
     if (platform === 'linux' && (arch === 'arm64' || arch === 'aarch64')) {
-      const systemChromium = process.env.PUPPETEER_EXECUTABLE_PATH_ARM64 || '/usr/bin/chromium';
+      const systemChromium = '/usr/bin/chromium';
       this.log('info', `ARM64 架构，使用系统 Chromium: ${systemChromium}`);
       return systemChromium;
     }

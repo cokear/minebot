@@ -66,9 +66,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Chromium for ARM64 architecture
+# Note: In Debian bookworm (used by node:20-slim), the package is 'chromium'
+# The binary path is /usr/bin/chromium
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        apt-get update && apt-get install -y chromium --no-install-recommends \
-        && rm -rf /var/lib/apt/lists/*; \
+    apt-get update && apt-get install -y chromium --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "Chromium installed at: $(which chromium || which chromium-browser || echo 'not found')"; \
     fi
 
 WORKDIR /app
@@ -87,7 +90,7 @@ RUN mkdir -p /app/server/data /app/server/logs
 
 # Install Puppeteer's bundled Chrome only for AMD64
 RUN if [ "$TARGETARCH" = "amd64" ]; then \
-        cd /app/server && npx puppeteer browsers install chrome; \
+    cd /app/server && npx puppeteer browsers install chrome; \
     fi
 
 # Set environment variables
@@ -95,15 +98,15 @@ ENV NODE_ENV=production
 ENV PORT=3000
 # Skip Puppeteer's automatic Chrome download (we handle it ourselves)
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-# For ARM64: Tell Puppeteer to use system Chromium
-ENV PUPPETEER_EXECUTABLE_PATH_ARM64=/usr/bin/chromium
+# For ARM64: Tell Puppeteer to use system Chromium (standard path in Debian)
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Expose port
 EXPOSE 3000
 
 # Health check - use /api/auth/check which doesn't require auth
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/check || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/check || exit 1
 
 # Start the server (use docker restart policy instead of PM2 for ARM compatibility)
 WORKDIR /app/server
