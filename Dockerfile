@@ -31,10 +31,15 @@ COPY server/package.json ./
 # Install production dependencies
 RUN npm install --omit=dev
 
-# Stage 3: Production image with Chrome for Puppeteer
+# Stage 3: Production image with Chrome/Chromium for Puppeteer
 FROM node:20-slim AS production
 
-# Install Chrome dependencies and Chrome
+# Detect architecture and install appropriate browser
+# ARM64: Install Chromium from apt (Puppeteer's Chrome doesn't support ARM Linux)
+# AMD64: Install Puppeteer's bundled Chrome
+ARG TARGETARCH
+
+# Install common dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -60,6 +65,12 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Chromium for ARM64 architecture
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get update && apt-get install -y chromium --no-install-recommends \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 WORKDIR /app
 
 # Copy server dependencies from stage 2
@@ -74,14 +85,18 @@ COPY --from=frontend-builder /app/dist ./dist/
 # Create data and logs directory
 RUN mkdir -p /app/server/data /app/server/logs
 
-# Install Puppeteer's bundled Chrome
-RUN cd /app/server && npx puppeteer browsers install chrome
+# Install Puppeteer's bundled Chrome only for AMD64
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        cd /app/server && npx puppeteer browsers install chrome; \
+    fi
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
-# Tell Puppeteer to skip downloading Chrome (we install it manually)
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+# Skip Puppeteer's automatic Chrome download (we handle it ourselves)
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+# For ARM64: Tell Puppeteer to use system Chromium
+ENV PUPPETEER_EXECUTABLE_PATH_ARM64=/usr/bin/chromium
 
 # Expose port
 EXPOSE 3000

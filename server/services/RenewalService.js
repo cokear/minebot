@@ -257,10 +257,31 @@ export class RenewalService {
   }
 
   /**
+   * 获取 Chrome/Chromium 可执行文件路径
+   * ARM64 Linux 使用系统安装的 Chromium，AMD64 使用 Puppeteer 自带的 Chrome
+   */
+  getChromePath() {
+    const os = require('os');
+    const arch = os.arch();
+    const platform = os.platform();
+
+    // ARM64 Linux: 使用系统 Chromium（因为 Puppeteer 的 Chrome 不支持 ARM Linux）
+    if (platform === 'linux' && (arch === 'arm64' || arch === 'aarch64')) {
+      const systemChromium = process.env.PUPPETEER_EXECUTABLE_PATH_ARM64 || '/usr/bin/chromium';
+      this.log('info', `ARM64 架构，使用系统 Chromium: ${systemChromium}`);
+      return systemChromium;
+    }
+
+    // 其他平台使用 Puppeteer 默认的 Chrome
+    return undefined;
+  }
+
+  /**
    * 获取或启动浏览器实例
    * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080 或带认证的 socks5://user:pass@host:port
    */
   async getBrowser(proxyUrl = null) {
+    const executablePath = this.getChromePath();
     let actualProxyUrl = proxyUrl;
 
     // 如果代理包含认证信息 (user:pass@host)，创建本地匿名代理
@@ -296,6 +317,7 @@ export class RenewalService {
       ];
       return await puppeteer.launch({
         headless: 'new',
+        executablePath,
         args
       });
     }
@@ -305,6 +327,7 @@ export class RenewalService {
       this.log('info', '启动无头浏览器...');
       this.browser = await puppeteer.launch({
         headless: 'new',
+        executablePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -391,12 +414,12 @@ export class RenewalService {
       // 检查并处理 Cookie 同意对话框 (GDPR)
       try {
         const consentBtn = await page.$('.fc-cta-consent') ||
-                          await page.$('button.fc-button.fc-cta-consent') ||
-                          await page.$('[aria-label="Consent"]') ||
-                          await page.$('button:has-text("Accept")') ||
-                          await page.$('button:has-text("Consent")') ||
-                          await page.$('button:has-text("I agree")') ||
-                          await page.$('button:has-text("Accept all")');
+          await page.$('button.fc-button.fc-cta-consent') ||
+          await page.$('[aria-label="Consent"]') ||
+          await page.$('button:has-text("Accept")') ||
+          await page.$('button:has-text("Consent")') ||
+          await page.$('button:has-text("I agree")') ||
+          await page.$('button:has-text("Accept all")');
         if (consentBtn) {
           this.log('info', '检测到 Cookie 同意对话框，点击同意...', id);
           await page.evaluate(btn => btn.click(), consentBtn);
@@ -451,7 +474,7 @@ export class RenewalService {
               this.log('info', `找到用户名输入框: ${selector}`, id);
               break;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         // 查找密码输入框
@@ -462,7 +485,7 @@ export class RenewalService {
               this.log('info', `找到密码输入框: ${selector}`, id);
               break;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (usernameInput && passwordInput) break;
@@ -531,7 +554,7 @@ export class RenewalService {
               this.log('info', `点击继续按钮: ${selector}`, id);
               break;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (!clickedContinue) {
@@ -552,7 +575,7 @@ export class RenewalService {
                 this.log('info', `找到密码输入框: ${selector}`, id);
                 break;
               }
-            } catch (e) {}
+            } catch (e) { }
           }
 
           if (passwordInput) break;
@@ -603,7 +626,7 @@ export class RenewalService {
             this.log('info', `找到登录按钮: ${selector} (${btnText.trim()})`, id);
             break;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (submitBtn) {
@@ -723,17 +746,17 @@ export class RenewalService {
 
       // 检查是否还在登录页
       const stillOnLoginPage = currentUrl.includes('/login') ||
-                               currentUrl.includes('/auth') ||
-                               currentContent.includes('Sign in') ||
-                               currentContent.includes('Login') ||
-                               currentContent.includes('登录');
+        currentUrl.includes('/auth') ||
+        currentContent.includes('Sign in') ||
+        currentContent.includes('Login') ||
+        currentContent.includes('登录');
 
       // 检查是否有错误信息
       const hasError = currentContent.includes('Invalid') ||
-                      currentContent.includes('incorrect') ||
-                      currentContent.includes('wrong') ||
-                      currentContent.includes('credentials') ||
-                      currentContent.includes('failed');
+        currentContent.includes('incorrect') ||
+        currentContent.includes('wrong') ||
+        currentContent.includes('credentials') ||
+        currentContent.includes('failed');
 
       if (hasError) {
         this.log('error', '登录失败：账号或密码错误', id);
@@ -879,9 +902,9 @@ export class RenewalService {
       // 检查是否已经登录（浏览器可能保留了之前的登录状态）
       let currentUrl = page.url();
       const alreadyLoggedIn = !currentUrl.includes('/login') &&
-                              !currentUrl.includes('/auth') &&
-                              !currentUrl.includes('/sign-in') &&
-                              !currentUrl.includes('signin');
+        !currentUrl.includes('/auth') &&
+        !currentUrl.includes('/sign-in') &&
+        !currentUrl.includes('signin');
 
       // 如果已登录，跳过登录流程，直接进入续期
       if (alreadyLoggedIn) {
@@ -890,163 +913,73 @@ export class RenewalService {
         // ========== 未登录，执行登录流程 ==========
         this.log('info', '未登录，开始登录流程...', id);
 
-      // 检查并处理 Cookie 同意对话框 (GDPR)
-      try {
-        const consentBtn = await page.$('.fc-cta-consent') ||
-                          await page.$('button.fc-button.fc-cta-consent') ||
-                          await page.$('[aria-label="Consent"]') ||
-                          await page.$('button:has-text("Accept")') ||
-                          await page.$('button:has-text("Consent")') ||
-                          await page.$('button:has-text("I agree")') ||
-                          await page.$('button:has-text("Accept all")');
-        if (consentBtn) {
-          this.log('info', '检测到 Cookie 同意对话框，点击同意...', id);
-          await page.evaluate(btn => btn.click(), consentBtn);
-          await this.delay(2000);
-        }
-      } catch (e) {
-        // 忽略错误，可能没有同意对话框
-      }
-
-      // 尝试查找并填写登录表单
-      this.log('info', '查找登录表单...', id);
-
-      // 翼龙面板的登录表单 - 等待输入框出现
-      // 尝试多种选择器
-      const usernameSelectors = [
-        'input[name="identifier"]',  // zampto.net
-        'input[name="user"]',
-        'input[name="username"]',
-        'input[name="email"]',
-        'input[type="email"]',
-        'input[id="user"]',
-        'input[id="username"]',
-        'input[id="identifier"]',
-        '#user',
-        '#username',
-        '#identifier',
-        'input[placeholder*="email"]',
-        'input[placeholder*="Email"]',
-        'input[placeholder*="user"]',
-        'input[placeholder*="User"]',
-        'input[autocomplete*="username"]',
-        'input[autocomplete*="email"]'
-      ];
-
-      const passwordSelectors = [
-        'input[name="password"]',
-        'input[type="password"]',
-        'input[id="password"]',
-        '#password'
-      ];
-
-      let usernameInput = null;
-      let passwordInput = null;
-
-      // 等待表单元素出现（最多等待 30 秒，Clerk 等 SPA 需要更长时间）
-      for (let attempt = 0; attempt < 10; attempt++) {
-        // 查找用户名输入框
-        for (const selector of usernameSelectors) {
-          try {
-            usernameInput = await page.$(selector);
-            if (usernameInput) {
-              this.log('info', `找到用户名输入框: ${selector}`, id);
-              break;
-            }
-          } catch (e) {}
+        // 检查并处理 Cookie 同意对话框 (GDPR)
+        try {
+          const consentBtn = await page.$('.fc-cta-consent') ||
+            await page.$('button.fc-button.fc-cta-consent') ||
+            await page.$('[aria-label="Consent"]') ||
+            await page.$('button:has-text("Accept")') ||
+            await page.$('button:has-text("Consent")') ||
+            await page.$('button:has-text("I agree")') ||
+            await page.$('button:has-text("Accept all")');
+          if (consentBtn) {
+            this.log('info', '检测到 Cookie 同意对话框，点击同意...', id);
+            await page.evaluate(btn => btn.click(), consentBtn);
+            await this.delay(2000);
+          }
+        } catch (e) {
+          // 忽略错误，可能没有同意对话框
         }
 
-        // 查找密码输入框
-        for (const selector of passwordSelectors) {
-          try {
-            passwordInput = await page.$(selector);
-            if (passwordInput) {
-              this.log('info', `找到密码输入框: ${selector}`, id);
-              break;
-            }
-          } catch (e) {}
-        }
+        // 尝试查找并填写登录表单
+        this.log('info', '查找登录表单...', id);
 
-        if (usernameInput && passwordInput) break;
-
-        // 如果找到用户名但没找到密码，可能是 Clerk 的多步登录
-        if (usernameInput && !passwordInput) {
-          this.log('info', '找到用户名框但未找到密码框，可能是多步登录', id);
-          break;
-        }
-
-        this.log('info', `等待表单加载... (${attempt + 1}/10)`, id);
-        await this.delay(3000);
-      }
-
-      // 如果找不到表单，打印页面上所有的 input 元素用于调试
-      if (!usernameInput) {
-        const allInputs = await page.$$eval('input', inputs =>
-          inputs.map(i => ({
-            type: i.type,
-            name: i.name,
-            id: i.id,
-            placeholder: i.placeholder,
-            autocomplete: i.autocomplete
-          }))
-        );
-        this.log('error', `页面上的 input 元素: ${JSON.stringify(allInputs)}`, id);
-
-        const title = await page.title();
-        this.log('error', `当前页面标题: ${title}`, id);
-        throw new Error('找不到登录表单');
-      }
-
-      // 清空并填写表单 - 使用键盘输入方式确保 React 状态更新
-      this.log('info', `填写登录信息... 用户名: ${panelUsername}`, id);
-
-      // 先清空输入框，然后使用键盘输入
-      await usernameInput.click({ clickCount: 3 }); // 选中所有文字
-      await this.delay(100);
-      await usernameInput.type(panelUsername, { delay: 50 });
-      await this.delay(300);
-
-      // 如果是多步登录（有用户名输入但没有密码输入），需要先点击 Continue
-      if (!passwordInput) {
-        this.log('info', '多步登录：点击继续按钮后等待密码框出现...', id);
-
-        // 查找并点击 Continue/Next 按钮
-        const continueSelectors = [
-          'button[type="submit"]',
-          'button[data-localization-key="formButtonPrimary"]',
-          'button:has-text("Continue")',
-          'button:has-text("continue")',
-          'button:has-text("Next")',
-          'button:has-text("继续")',
-          'button:has-text("下一步")',
-          '.cl-formButtonPrimary',
-          'form button'
+        // 翼龙面板的登录表单 - 等待输入框出现
+        // 尝试多种选择器
+        const usernameSelectors = [
+          'input[name="identifier"]',  // zampto.net
+          'input[name="user"]',
+          'input[name="username"]',
+          'input[name="email"]',
+          'input[type="email"]',
+          'input[id="user"]',
+          'input[id="username"]',
+          'input[id="identifier"]',
+          '#user',
+          '#username',
+          '#identifier',
+          'input[placeholder*="email"]',
+          'input[placeholder*="Email"]',
+          'input[placeholder*="user"]',
+          'input[placeholder*="User"]',
+          'input[autocomplete*="username"]',
+          'input[autocomplete*="email"]'
         ];
 
-        let clickedContinue = false;
-        for (const selector of continueSelectors) {
-          try {
-            const continueBtn = await page.$(selector);
-            if (continueBtn) {
-              await continueBtn.click();
-              clickedContinue = true;
-              this.log('info', `点击继续按钮: ${selector}`, id);
-              break;
-            }
-          } catch (e) {}
-        }
+        const passwordSelectors = [
+          'input[name="password"]',
+          'input[type="password"]',
+          'input[id="password"]',
+          '#password'
+        ];
 
-        if (!clickedContinue) {
-          // 尝试按回车
-          await page.keyboard.press('Enter');
-          this.log('info', '尝试按回车继续', id);
-        }
+        let usernameInput = null;
+        let passwordInput = null;
 
-        // 等待密码框出现
-        this.log('info', '等待密码输入框出现...', id);
-        for (let i = 0; i < 10; i++) {
-          await this.delay(2000);
+        // 等待表单元素出现（最多等待 30 秒，Clerk 等 SPA 需要更长时间）
+        for (let attempt = 0; attempt < 10; attempt++) {
+          // 查找用户名输入框
+          for (const selector of usernameSelectors) {
+            try {
+              usernameInput = await page.$(selector);
+              if (usernameInput) {
+                this.log('info', `找到用户名输入框: ${selector}`, id);
+                break;
+              }
+            } catch (e) { }
+          }
 
+          // 查找密码输入框
           for (const selector of passwordSelectors) {
             try {
               passwordInput = await page.$(selector);
@@ -1054,183 +987,273 @@ export class RenewalService {
                 this.log('info', `找到密码输入框: ${selector}`, id);
                 break;
               }
-            } catch (e) {}
+            } catch (e) { }
           }
 
-          if (passwordInput) break;
-          this.log('info', `等待密码框... (${i + 1}/10)`, id);
+          if (usernameInput && passwordInput) break;
+
+          // 如果找到用户名但没找到密码，可能是 Clerk 的多步登录
+          if (usernameInput && !passwordInput) {
+            this.log('info', '找到用户名框但未找到密码框，可能是多步登录', id);
+            break;
+          }
+
+          this.log('info', `等待表单加载... (${attempt + 1}/10)`, id);
+          await this.delay(3000);
         }
 
-        if (!passwordInput) {
-          // 打印当前页面的 input 元素用于调试
+        // 如果找不到表单，打印页面上所有的 input 元素用于调试
+        if (!usernameInput) {
           const allInputs = await page.$$eval('input', inputs =>
             inputs.map(i => ({
               type: i.type,
               name: i.name,
               id: i.id,
-              placeholder: i.placeholder
+              placeholder: i.placeholder,
+              autocomplete: i.autocomplete
             }))
           );
-          this.log('error', `未找到密码框，页面 input 元素: ${JSON.stringify(allInputs)}`, id);
-          throw new Error('多步登录失败：未找到密码输入框');
-        }
-      }
+          this.log('error', `页面上的 input 元素: ${JSON.stringify(allInputs)}`, id);
 
-      // 填写密码 - 使用键盘输入方式确保 React 状态更新
-      this.log('info', '填写密码...', id);
-      await this.delay(300);
-      await passwordInput.click({ clickCount: 3 }); // 选中所有文字
-      await this.delay(100);
-      await passwordInput.type(panelPassword, { delay: 50 });
-      await this.delay(500);
-
-      // 查找并点击登录按钮
-      this.log('info', '查找登录按钮...', id);
-      const submitSelectors = [
-        'button[type="submit"]',
-        'button[data-localization-key="formButtonPrimary"]',
-        'input[type="submit"]',
-        '.cl-formButtonPrimary',
-        '.login-button',
-        '#login-button',
-        'form button'
-      ];
-
-      let submitBtn = null;
-      for (const selector of submitSelectors) {
-        try {
-          submitBtn = await page.$(selector);
-          if (submitBtn) {
-            const btnText = await page.evaluate(el => el.textContent || '', submitBtn);
-            this.log('info', `找到登录按钮: ${selector} (${btnText.trim()})`, id);
-            break;
-          }
-        } catch (e) {}
-      }
-
-      if (submitBtn) {
-        // 检查是否有 reCAPTCHA
-        const hasRecaptcha = await page.evaluate(() => {
-          return !!(
-            document.querySelector('.g-recaptcha') ||
-            document.querySelector('[data-sitekey]') ||
-            document.querySelector('iframe[src*="recaptcha"]') ||
-            window.grecaptcha
-          );
-        });
-
-        if (hasRecaptcha) {
-          this.log('info', '检测到 reCAPTCHA，等待验证...', id);
-          // 等待 reCAPTCHA v3 自动评分或 invisible reCAPTCHA 加载
-          await this.delay(3000);
-
-          // 尝试执行 reCAPTCHA（如果是 v3 或 invisible）
-          try {
-            await page.evaluate(() => {
-              if (window.grecaptcha && window.grecaptcha.execute) {
-                // 尝试获取 sitekey
-                const recaptchaEl = document.querySelector('[data-sitekey]');
-                if (recaptchaEl) {
-                  const sitekey = recaptchaEl.getAttribute('data-sitekey');
-                  window.grecaptcha.execute(sitekey);
-                } else {
-                  window.grecaptcha.execute();
-                }
-              }
-            });
-            this.log('info', '尝试执行 reCAPTCHA...', id);
-            await this.delay(3000);
-          } catch (e) {
-            // 忽略错误
-          }
+          const title = await page.title();
+          this.log('error', `当前页面标题: ${title}`, id);
+          throw new Error('找不到登录表单');
         }
 
-        // 使用多种方式尝试提交表单
-        this.log('info', '点击登录按钮', id);
+        // 清空并填写表单 - 使用键盘输入方式确保 React 状态更新
+        this.log('info', `填写登录信息... 用户名: ${panelUsername}`, id);
 
-        // 方式1: 直接点击按钮
-        await submitBtn.click();
-        await this.delay(3000);
+        // 先清空输入框，然后使用键盘输入
+        await usernameInput.click({ clickCount: 3 }); // 选中所有文字
+        await this.delay(100);
+        await usernameInput.type(panelUsername, { delay: 50 });
+        await this.delay(300);
 
-        // 检查是否还在登录页
-        let currentLoginUrl = page.url();
-        if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-          // 可能 reCAPTCHA 验证中，多等待一些
-          if (hasRecaptcha) {
-            this.log('info', '等待 reCAPTCHA 验证完成...', id);
-            await this.delay(5000);
-            currentLoginUrl = page.url();
-          }
+        // 如果是多步登录（有用户名输入但没有密码输入），需要先点击 Continue
+        if (!passwordInput) {
+          this.log('info', '多步登录：点击继续按钮后等待密码框出现...', id);
 
-          if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-            this.log('info', '尝试提交表单...', id);
-            // 方式2: 尝试提交表单
+          // 查找并点击 Continue/Next 按钮
+          const continueSelectors = [
+            'button[type="submit"]',
+            'button[data-localization-key="formButtonPrimary"]',
+            'button:has-text("Continue")',
+            'button:has-text("continue")',
+            'button:has-text("Next")',
+            'button:has-text("继续")',
+            'button:has-text("下一步")',
+            '.cl-formButtonPrimary',
+            'form button'
+          ];
+
+          let clickedContinue = false;
+          for (const selector of continueSelectors) {
             try {
-              await page.evaluate(() => {
-                const form = document.querySelector('form');
-                if (form) form.submit();
-              });
-            } catch (e) {
-              // 忽略，可能表单已提交
-            }
+              const continueBtn = await page.$(selector);
+              if (continueBtn) {
+                await continueBtn.click();
+                clickedContinue = true;
+                this.log('info', `点击继续按钮: ${selector}`, id);
+                break;
+              }
+            } catch (e) { }
+          }
+
+          if (!clickedContinue) {
+            // 尝试按回车
+            await page.keyboard.press('Enter');
+            this.log('info', '尝试按回车继续', id);
+          }
+
+          // 等待密码框出现
+          this.log('info', '等待密码输入框出现...', id);
+          for (let i = 0; i < 10; i++) {
             await this.delay(2000);
 
-            // 方式3: 使用键盘按回车
-            currentLoginUrl = page.url();
-            if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
-              this.log('info', '尝试按回车提交...', id);
-              await page.keyboard.press('Enter');
+            for (const selector of passwordSelectors) {
+              try {
+                passwordInput = await page.$(selector);
+                if (passwordInput) {
+                  this.log('info', `找到密码输入框: ${selector}`, id);
+                  break;
+                }
+              } catch (e) { }
+            }
+
+            if (passwordInput) break;
+            this.log('info', `等待密码框... (${i + 1}/10)`, id);
+          }
+
+          if (!passwordInput) {
+            // 打印当前页面的 input 元素用于调试
+            const allInputs = await page.$$eval('input', inputs =>
+              inputs.map(i => ({
+                type: i.type,
+                name: i.name,
+                id: i.id,
+                placeholder: i.placeholder
+              }))
+            );
+            this.log('error', `未找到密码框，页面 input 元素: ${JSON.stringify(allInputs)}`, id);
+            throw new Error('多步登录失败：未找到密码输入框');
+          }
+        }
+
+        // 填写密码 - 使用键盘输入方式确保 React 状态更新
+        this.log('info', '填写密码...', id);
+        await this.delay(300);
+        await passwordInput.click({ clickCount: 3 }); // 选中所有文字
+        await this.delay(100);
+        await passwordInput.type(panelPassword, { delay: 50 });
+        await this.delay(500);
+
+        // 查找并点击登录按钮
+        this.log('info', '查找登录按钮...', id);
+        const submitSelectors = [
+          'button[type="submit"]',
+          'button[data-localization-key="formButtonPrimary"]',
+          'input[type="submit"]',
+          '.cl-formButtonPrimary',
+          '.login-button',
+          '#login-button',
+          'form button'
+        ];
+
+        let submitBtn = null;
+        for (const selector of submitSelectors) {
+          try {
+            submitBtn = await page.$(selector);
+            if (submitBtn) {
+              const btnText = await page.evaluate(el => el.textContent || '', submitBtn);
+              this.log('info', `找到登录按钮: ${selector} (${btnText.trim()})`, id);
+              break;
+            }
+          } catch (e) { }
+        }
+
+        if (submitBtn) {
+          // 检查是否有 reCAPTCHA
+          const hasRecaptcha = await page.evaluate(() => {
+            return !!(
+              document.querySelector('.g-recaptcha') ||
+              document.querySelector('[data-sitekey]') ||
+              document.querySelector('iframe[src*="recaptcha"]') ||
+              window.grecaptcha
+            );
+          });
+
+          if (hasRecaptcha) {
+            this.log('info', '检测到 reCAPTCHA，等待验证...', id);
+            // 等待 reCAPTCHA v3 自动评分或 invisible reCAPTCHA 加载
+            await this.delay(3000);
+
+            // 尝试执行 reCAPTCHA（如果是 v3 或 invisible）
+            try {
+              await page.evaluate(() => {
+                if (window.grecaptcha && window.grecaptcha.execute) {
+                  // 尝试获取 sitekey
+                  const recaptchaEl = document.querySelector('[data-sitekey]');
+                  if (recaptchaEl) {
+                    const sitekey = recaptchaEl.getAttribute('data-sitekey');
+                    window.grecaptcha.execute(sitekey);
+                  } else {
+                    window.grecaptcha.execute();
+                  }
+                }
+              });
+              this.log('info', '尝试执行 reCAPTCHA...', id);
+              await this.delay(3000);
+            } catch (e) {
+              // 忽略错误
             }
           }
-        }
-      } else {
-        // 尝试按回车提交
-        this.log('info', '未找到登录按钮，尝试按回车提交', id);
-        await page.keyboard.press('Enter');
-      }
 
-      // 等待登录完成
-      this.log('info', '等待登录完成...', id);
-      await this.delay(5000);
+          // 使用多种方式尝试提交表单
+          this.log('info', '点击登录按钮', id);
 
-      // 等待页面跳转或登录完成
-      try {
-        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
-      } catch (e) {
-        // 可能已经在目标页面了
-        this.log('info', '导航超时，检查当前页面...', id);
-      }
+          // 方式1: 直接点击按钮
+          await submitBtn.click();
+          await this.delay(3000);
 
-      // 再等待一下确保登录完成
-      await this.delay(2000);
+          // 检查是否还在登录页
+          let currentLoginUrl = page.url();
+          if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+            // 可能 reCAPTCHA 验证中，多等待一些
+            if (hasRecaptcha) {
+              this.log('info', '等待 reCAPTCHA 验证完成...', id);
+              await this.delay(5000);
+              currentLoginUrl = page.url();
+            }
 
-      // 检查登录是否成功
-      let currentUrl = page.url();
-      this.log('info', `登录后页面: ${currentUrl}`, id);
+            if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+              this.log('info', '尝试提交表单...', id);
+              // 方式2: 尝试提交表单
+              try {
+                await page.evaluate(() => {
+                  const form = document.querySelector('form');
+                  if (form) form.submit();
+                });
+              } catch (e) {
+                // 忽略，可能表单已提交
+              }
+              await this.delay(2000);
 
-      // 如果还在登录页，可能登录失败，再等待一下
-      if (currentUrl.includes('/auth/login') || currentUrl.includes('/login') || currentUrl.includes('/sign-in')) {
-        this.log('info', '仍在登录页，等待跳转...', id);
-        await this.delay(5000);
-        currentUrl = page.url();
-        this.log('info', `等待后页面: ${currentUrl}`, id);
-
-        if (currentUrl.includes('/auth/login') || currentUrl.includes('/login') || currentUrl.includes('/sign-in')) {
-          const currentContent = await page.content();
-          const hasError = currentContent.includes('Invalid') ||
-                          currentContent.includes('incorrect') ||
-                          currentContent.includes('wrong') ||
-                          currentContent.includes('credentials') ||
-                          currentContent.includes('These credentials do not match');
-          if (hasError) {
-            this.log('error', '检测到登录错误信息', id);
-            throw new Error('登录失败：账号或密码错误');
+              // 方式3: 使用键盘按回车
+              currentLoginUrl = page.url();
+              if (currentLoginUrl.includes('/auth/login') || currentLoginUrl.includes('/login')) {
+                this.log('info', '尝试按回车提交...', id);
+                await page.keyboard.press('Enter');
+              }
+            }
           }
-          // 尝试查看页面上有什么
-          const pageTitle = await page.title();
-          this.log('warning', `登录后仍在登录页面，页面标题: ${pageTitle}`, id);
+        } else {
+          // 尝试按回车提交
+          this.log('info', '未找到登录按钮，尝试按回车提交', id);
+          await page.keyboard.press('Enter');
         }
-      }
+
+        // 等待登录完成
+        this.log('info', '等待登录完成...', id);
+        await this.delay(5000);
+
+        // 等待页面跳转或登录完成
+        try {
+          await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
+        } catch (e) {
+          // 可能已经在目标页面了
+          this.log('info', '导航超时，检查当前页面...', id);
+        }
+
+        // 再等待一下确保登录完成
+        await this.delay(2000);
+
+        // 检查登录是否成功
+        let currentUrl = page.url();
+        this.log('info', `登录后页面: ${currentUrl}`, id);
+
+        // 如果还在登录页，可能登录失败，再等待一下
+        if (currentUrl.includes('/auth/login') || currentUrl.includes('/login') || currentUrl.includes('/sign-in')) {
+          this.log('info', '仍在登录页，等待跳转...', id);
+          await this.delay(5000);
+          currentUrl = page.url();
+          this.log('info', `等待后页面: ${currentUrl}`, id);
+
+          if (currentUrl.includes('/auth/login') || currentUrl.includes('/login') || currentUrl.includes('/sign-in')) {
+            const currentContent = await page.content();
+            const hasError = currentContent.includes('Invalid') ||
+              currentContent.includes('incorrect') ||
+              currentContent.includes('wrong') ||
+              currentContent.includes('credentials') ||
+              currentContent.includes('These credentials do not match');
+            if (hasError) {
+              this.log('error', '检测到登录错误信息', id);
+              throw new Error('登录失败：账号或密码错误');
+            }
+            // 尝试查看页面上有什么
+            const pageTitle = await page.title();
+            this.log('warning', `登录后仍在登录页面，页面标题: ${pageTitle}`, id);
+          }
+        }
       } // 结束 if (!alreadyLoggedIn) 登录流程
 
       // ========== 续期部分 ==========
@@ -1256,8 +1279,8 @@ export class RenewalService {
       // 检查并处理续期页面的 Cookie 同意对话框 (GDPR)
       try {
         const consentBtn = await page.$('.fc-cta-consent') ||
-                          await page.$('button.fc-button.fc-cta-consent') ||
-                          await page.$('[aria-label="Consent"]');
+          await page.$('button.fc-button.fc-cta-consent') ||
+          await page.$('[aria-label="Consent"]');
         if (consentBtn) {
           this.log('info', '检测到续期页面 Cookie 同意对话框，点击同意...', id);
           await page.evaluate(btn => btn.click(), consentBtn);
@@ -1292,7 +1315,7 @@ export class RenewalService {
           if (renewButton) {
             this.log('info', `找到指定的续期按钮: ${renewButtonSelector}`, id);
           }
-        } catch (e) {}
+        } catch (e) { }
       }
 
       // 自动查找续期按钮
@@ -1304,7 +1327,7 @@ export class RenewalService {
             renewButton = renewalByOnclick;
             this.log('info', '通过 onclick 属性找到续期按钮', id);
           }
-        } catch (e) {}
+        } catch (e) { }
 
         // 尝试通过 class 查找
         if (!renewButton) {
@@ -1314,7 +1337,7 @@ export class RenewalService {
               renewButton = renewalByClass;
               this.log('info', '通过 class 找到续期按钮', id);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         // 通过文字内容查找
@@ -1348,7 +1371,7 @@ export class RenewalService {
                 if (renewButton) break;
               }
               if (renewButton) break;
-            } catch (e) {}
+            } catch (e) { }
           }
         }
       }
@@ -1408,7 +1431,7 @@ export class RenewalService {
               if (renewButtonAgain) break;
             }
             if (renewButtonAgain) break;
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (renewButtonAgain) {
@@ -1423,16 +1446,16 @@ export class RenewalService {
       // 检查是否有确认对话框
       try {
         const confirmBtn = await page.$('button:has-text("Confirm")') ||
-                          await page.$('button:has-text("确认")') ||
-                          await page.$('button:has-text("OK")') ||
-                          await page.$('.modal button[type="submit"]') ||
-                          await page.$('.dialog button[type="submit"]');
+          await page.$('button:has-text("确认")') ||
+          await page.$('button:has-text("OK")') ||
+          await page.$('.modal button[type="submit"]') ||
+          await page.$('.dialog button[type="submit"]');
         if (confirmBtn) {
           this.log('info', '点击确认按钮...', id);
           await confirmBtn.click();
           await this.delay(3000);
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // 等待操作完成
       await this.delay(2000);
@@ -1443,18 +1466,18 @@ export class RenewalService {
       this.log('info', `续期后页面: ${finalUrl}`, id);
 
       const success = finalContent.includes('success') ||
-                     finalContent.includes('Success') ||
-                     finalContent.includes('成功') ||
-                     finalContent.includes('renewed') ||
-                     finalContent.includes('Renewed') ||
-                     finalContent.includes('extended') ||
-                     finalContent.includes('Extended');
+        finalContent.includes('Success') ||
+        finalContent.includes('成功') ||
+        finalContent.includes('renewed') ||
+        finalContent.includes('Renewed') ||
+        finalContent.includes('extended') ||
+        finalContent.includes('Extended');
 
       const hasError = finalContent.includes('error') ||
-                      finalContent.includes('Error') ||
-                      finalContent.includes('failed') ||
-                      finalContent.includes('Failed') ||
-                      finalContent.includes('失败');
+        finalContent.includes('Error') ||
+        finalContent.includes('failed') ||
+        finalContent.includes('Failed') ||
+        finalContent.includes('失败');
 
       const result = {
         success: !hasError,
@@ -1507,7 +1530,7 @@ export class RenewalService {
     // 获取续期模式（兼容旧配置）
     const mode = renewal.mode ||
       (renewal.useBrowserClick && renewal.autoLogin ? 'browserClick' :
-       renewal.autoLogin ? 'autoLoginHttp' : 'http');
+        renewal.autoLogin ? 'autoLoginHttp' : 'http');
 
     // 模式1: 浏览器自动点击
     if (mode === 'browserClick') {
@@ -1602,12 +1625,12 @@ export class RenewalService {
 
       // 检查是否需要重新登录 (401/403 或者响应包含登录页面特征)
       const needReLogin = (status === 401 || status === 403) ||
-                         responseText.includes('login') ||
-                         responseText.includes('sign-in') ||
-                         responseText.includes('Sign in') ||
-                         responseText.includes('unauthorized') ||
-                         responseText.includes('unauthenticated') ||
-                         responseText.includes('Please sign in');
+        responseText.includes('login') ||
+        responseText.includes('sign-in') ||
+        responseText.includes('Sign in') ||
+        responseText.includes('unauthorized') ||
+        responseText.includes('unauthenticated') ||
+        responseText.includes('Please sign in');
 
       if (needReLogin && mode === 'autoLoginHttp' && retryWithLogin) {
         this.log('info', `Cookie 可能已过期 (状态码: ${status})，尝试重新登录...`, id);
