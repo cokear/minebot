@@ -267,8 +267,15 @@ export class BotInstance {
     // 缩短等待时间
     await new Promise(r => setTimeout(r, 200));
 
+    // 只使用手动配置的地址，不使用面板API获取的地址
     const host = this.config.host;
     const port = this.config.port || 25565;
+    
+    if (!host) {
+      this.log('error', '未配置服务器地址，请在设置中配置 host', '❌');
+      throw new Error('未配置服务器地址');
+    }
+    
     const username = this.config.username || this.generateUsername();
     const version = this.config.version || false;
 
