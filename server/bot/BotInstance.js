@@ -11,7 +11,8 @@ import SftpClient from 'ssh2-sftp-client';
 export class BotInstance {
   constructor(id, config, aiService, onLog, onStatusChange, configManager = null) {
     this.id = id;
-    this.config = config;
+    // 深拷贝config，防止外部修改影响连接地址
+    this.config = JSON.parse(JSON.stringify(config));
     this.aiService = aiService;
     this.onLog = onLog;
     this.onStatusChange = onStatusChange;
