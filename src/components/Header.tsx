@@ -27,8 +27,6 @@ export function Header() {
 
   const navLinks = [
     { name: "控制面板", href: "/" },
-    { name: "系统架构", href: "/architecture" }, // Assuming routing exists, otherwise #architecture
-    { name: "指令大全", href: "/commands" },    // Assuming routing exists, otherwise #commands
   ];
 
   return (
