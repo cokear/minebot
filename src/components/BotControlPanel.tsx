@@ -679,7 +679,7 @@ export function BotControlPanel({
               </TabsList>
 
               {/* 定时重启设置 */}
-              <TabsContent value="restart" className="space-y-4">
+              <TabsContent value="restart" className="space-y-4 h-[60vh] overflow-y-auto pr-2">
                 <div className="space-y-2">
                   <Label>重启间隔 (分钟)</Label>
                   <div className="flex gap-2">
@@ -720,7 +720,7 @@ export function BotControlPanel({
               </TabsContent>
 
               {/* 自动喊话设置 */}
-              <TabsContent value="chat" className="space-y-4">
+              <TabsContent value="chat" className="space-y-4 h-[60vh] overflow-y-auto pr-2">
                 <div className="flex items-center justify-between">
                   <Label>启用自动喊话</Label>
                   <Switch
@@ -758,7 +758,7 @@ export function BotControlPanel({
               </TabsContent>
 
               {/* 翼龙面板设置 */}
-              <TabsContent value="panel" className="space-y-4">
+              <TabsContent value="panel" className="space-y-4 h-[60vh] overflow-y-auto pr-2">
                 <div className="space-y-2">
                   <Label>面板地址</Label>
                   <Input
@@ -862,7 +862,7 @@ export function BotControlPanel({
               </TabsContent>
 
               {/* SFTP 设置 */}
-              <TabsContent value="sftp" className="space-y-4">
+              <TabsContent value="sftp" className="space-y-4 h-[60vh] overflow-y-auto pr-2">
                 {/* 文件访问方式选择 */}
                 <div className="space-y-2">
                   <Label>文件访问方式</Label>
