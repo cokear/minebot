@@ -47,7 +47,7 @@ export function StatusCard({
           </div>
 
           <div className="space-y-1">
-            <p className="text-2xl font-bold tracking-tight text-foreground transition-all duration-300 group-hover:text-glow">
+            <p className="text-2xl font-bold tracking-tight text-foreground transition-all duration-300 group-hover:text-glow min-w-[80px]">
               {value}
             </p>
             {description && (

@@ -45,7 +45,6 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
                 description="WebSocket 实时通信"
                 icon={connected ? Wifi : WifiOff}
                 status={connected ? "online" : "offline"}
-                className="delay-100 animate-in slide-in-from-bottom"
             />
 
             {/* Bot Count */}
@@ -55,7 +54,6 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
                 description="当前活跃机器人数量"
                 icon={Server}
                 status="online"
-                className="delay-200 animate-in slide-in-from-bottom"
             />
 
             {/* Memory Status */}
@@ -65,7 +63,6 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
                 description={memory ? `${memory.used} / ${memory.total} MB` : "获取中..."}
                 icon={HardDrive}
                 status={memoryStatus}
-                className="delay-300 animate-in slide-in-from-bottom"
             />
 
             {/* Total Player Count */}
@@ -75,7 +72,6 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
                 description="所有服务器总人数"
                 icon={Users}
                 status={totalPlayers > 0 ? "online" : "warning"}
-                className="delay-400 animate-in slide-in-from-bottom"
             />
         </div>
     );
