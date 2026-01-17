@@ -633,7 +633,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
         </div>
 
         {/* 文件列表 */}
-        <div className="border rounded-lg overflow-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
+        <div className="flex-1 min-h-0 border rounded-lg overflow-auto">
           <div className="min-w-[500px]">
             {/* 表头 */}
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b text-sm font-medium sticky top-0">

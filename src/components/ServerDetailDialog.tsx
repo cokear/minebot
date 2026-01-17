@@ -532,14 +532,12 @@ export function ServerDetailDialog({
 
             {/* 文件管理 */}
             {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
-              <TabsContent value="files" className="mt-0 h-full animate-in slide-in-from-bottom-2 duration-300">
-                <div className="h-[calc(100vh-200px)]">
-                  <FileManager
-                    serverId={server.id}
-                    serverName={server.name || server.id}
-                    compact
-                  />
-                </div>
+              <TabsContent value="files" className="mt-0 h-full flex flex-col animate-in slide-in-from-bottom-2 duration-300">
+                <FileManager
+                  serverId={server.id}
+                  serverName={server.name || server.id}
+                  compact
+                />
               </TabsContent>
             )}
           </div>
