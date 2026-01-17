@@ -536,6 +536,314 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
 
   const hasChanges = fileContent !== originalContent;
 
+  // compact 模式下的简化渲染
+  if (compact) {
+    return (
+      <>
+        <div className="space-y-3">
+          {/* 工具栏 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goBack}
+                disabled={historyIndex <= 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={goForward}
+                disabled={historyIndex >= pathHistory.length - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={goUp} disabled={currentPath === "/"}>
+                <Home className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => loadFiles()} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+
+            <div className="flex-1 px-3 py-1.5 bg-muted rounded-md text-sm font-mono truncate">
+              {currentPath}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <label>
+                <Input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
+                <Button variant="outline" size="sm" asChild disabled={uploading}>
+                  <span className="cursor-pointer">
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    <span className="ml-1 hidden sm:inline">上传</span>
+                  </span>
+                </Button>
+              </label>
+              <Button variant="outline" size="sm" onClick={() => setNewFolderOpen(true)}>
+                <FolderPlus className="h-4 w-4" />
+                <span className="ml-1 hidden sm:inline">新建</span>
+              </Button>
+              {selectedFiles.size > 0 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleCompress}>
+                    <Archive className="h-4 w-4" />
+                    <span className="ml-1 hidden sm:inline">压缩</span>
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span className="ml-1 hidden sm:inline">删除 ({selectedFiles.size})</span>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 文件列表 */}
+          <div className="border rounded-lg overflow-auto max-h-[calc(100vh-280px)]">
+            <div className="min-w-[500px]">
+              {/* 表头 */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b text-sm font-medium sticky top-0">
+                <Checkbox
+                  checked={files.length > 0 && selectedFiles.size === files.length}
+                  onCheckedChange={toggleSelectAll}
+                />
+                <div className="flex-1">名称</div>
+                <div className="w-20 text-right">大小</div>
+                <div className="w-28 text-right">修改时间</div>
+                <div className="w-10"></div>
+              </div>
+
+              {/* 文件项 */}
+              {loading && files.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : files.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  空文件夹
+                </div>
+              ) : (
+                files.map((file) => (
+                  <div
+                    key={file.name}
+                    className={`flex items-center gap-2 px-3 py-2 hover:bg-muted/50 border-b last:border-0 ${selectedFiles.has(file.name) ? "bg-muted/30" : ""
+                      }`}
+                  >
+                    <Checkbox
+                      checked={selectedFiles.has(file.name)}
+                      onCheckedChange={() => toggleSelect(file.name)}
+                    />
+                    <div
+                      className="flex-1 flex items-center gap-2 cursor-pointer"
+                      onClick={() => {
+                        if (!file.isFile) {
+                          enterFolder(file.name);
+                        } else if (file.isEditable) {
+                          handleEdit(file);
+                        }
+                      }}
+                    >
+                      {getFileIcon(file)}
+                      <span className="truncate">{file.name}</span>
+                    </div>
+                    <div className="w-20 text-right text-sm text-muted-foreground">
+                      {file.isFile ? formatSize(file.size) : "-"}
+                    </div>
+                    <div className="w-28 text-right text-sm text-muted-foreground">
+                      {formatDate(file.modifiedAt)}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {file.isFile && file.isEditable && (
+                          <DropdownMenuItem onClick={() => handleEdit(file)}>
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            编辑
+                          </DropdownMenuItem>
+                        )}
+                        {file.isFile && (
+                          <DropdownMenuItem onClick={() => handleDownload(file)}>
+                            <Download className="h-4 w-4 mr-2" />
+                            下载
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handleCopy(file)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          复制
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setRenameTarget(file);
+                            setNewName(file.name);
+                            setRenameOpen(true);
+                          }}
+                        >
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          重命名
+                        </DropdownMenuItem>
+                        {file.isFile && isArchive(file.name) && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleDecompress(file)}>
+                              <Archive className="h-4 w-4 mr-2" />
+                              解压
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => {
+                            setSelectedFiles(new Set([file.name]));
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          删除
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 对话框 */}
+        <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>新建文件夹</DialogTitle>
+              <DialogDescription>在 {currentPath} 中创建新文件夹</DialogDescription>
+            </DialogHeader>
+            <Input
+              placeholder="文件夹名称"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setNewFolderOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()}>
+                创建
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>重命名</DialogTitle>
+              <DialogDescription>
+                将 "{renameTarget?.name}" 重命名为
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              placeholder="新名称"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleRename()}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenameOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleRename} disabled={!newName.trim()}>
+                确定
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>确认删除</AlertDialogTitle>
+              <AlertDialogDescription>
+                确定要删除选中的 {selectedFiles.size} 个项目吗？此操作不可撤销。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>取消</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+                删除
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={editorOpen} onOpenChange={(open) => {
+          if (!open && hasChanges) {
+            if (!confirm("有未保存的更改，确定要关闭吗？")) return;
+          }
+          setEditorOpen(open);
+          if (!open) {
+            setEditingFile(null);
+            setFileContent("");
+            setOriginalContent("");
+          }
+        }}>
+          <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileCode className="h-5 w-5" />
+                {editingFile?.split("/").pop()}
+                {hasChanges && <span className="text-orange-500">*</span>}
+              </DialogTitle>
+              <DialogDescription>{editingFile}</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden">
+              <Textarea
+                value={fileContent}
+                onChange={(e) => setFileContent(e.target.value)}
+                className="h-full w-full font-mono text-sm resize-none"
+                placeholder="文件内容..."
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditorOpen(false)}>
+                关闭
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !hasChanges}>
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                保存
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
   return (
     <Card className={`w-full border-0 shadow-none ${compact ? '' : 'h-full flex flex-col'}`}>
       {!compact && (
