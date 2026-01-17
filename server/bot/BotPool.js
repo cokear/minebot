@@ -107,17 +107,17 @@ export class BotPool {
         console.log(`已加载服务器: ${serverConfig.name || serverConfig.id} (${serverConfig.type || 'minecraft'})`);
       }
 
-      // 然后并行连接所有面板服务器（不阻塞）
+      // 然后并行连接所有服务器（不阻塞）
       for (const serverConfig of servers) {
-        if (serverConfig.type === 'panel') {
-          const instance = this.bots.get(serverConfig.id);
-          // 使用 setTimeout 确保不阻塞主线程
-          setTimeout(() => {
-            instance.connect().catch(err => {
-              console.log(`面板服务器 ${serverConfig.name || serverConfig.id} 连接失败: ${err.message}`);
-            });
-          }, 0);
-        }
+        const instance = this.bots.get(serverConfig.id);
+        const type = serverConfig.type || 'minecraft';
+        // 使用 setTimeout 确保不阻塞主线程，游戏服务器延迟一点避免同时连接
+        const delay = type === 'panel' ? 0 : 500;
+        setTimeout(() => {
+          instance.connect().catch(err => {
+            console.log(`${type === 'panel' ? '面板' : '游戏'}服务器 ${serverConfig.name || serverConfig.id} 连接失败: ${err.message}`);
+          });
+        }, delay);
       }
     }
   }
