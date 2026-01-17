@@ -573,7 +573,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
             </div>
 
             <div className="flex items-center gap-1">
-              <label className="cursor-pointer">
+              <label>
                 <Input
                   type="file"
                   multiple
@@ -581,8 +581,8 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
                   onChange={handleUpload}
                   disabled={uploading}
                 />
-                <Button variant="outline" size="sm" asChild>
-                  <span>
+                <Button variant="outline" size="sm" asChild disabled={uploading}>
+                  <span className="cursor-pointer">
                     {uploading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
