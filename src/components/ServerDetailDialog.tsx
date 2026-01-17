@@ -305,30 +305,43 @@ export function ServerDetailDialog({
             </TabsList>
           </div>
 
-          <div ref={contentRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6">
-            {/* 控制面板 */}
-            <TabsContent value="control" className="mt-0 space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-              {/* 服务器信息 */}
-              <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-                <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wider">地址</span>
-                    <span className="font-mono font-medium">
-                      {isPanel && server.serverHost
-                        ? `${server.serverHost}:${server.serverPort}`
-                        : `${server.host}:${server.port}`}
-                    </span>
-                  </div>
-                  {!isPanel && server.username && (
+          {/* 文件管理 - 完全独立的层，覆盖其他内容 */}
+          {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+            <div className="flex-1 overflow-y-auto p-6">
+              <FileManager
+                serverId={server.id}
+                serverName={server.name || server.id}
+                compact
+              />
+            </div>
+          )}
+
+          {/* 其他标签页内容 */}
+          {activeTab !== 'files' && (
+            <div ref={contentRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+              {/* 控制面板 */}
+              <TabsContent value="control" className="mt-0 space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+                {/* 服务器信息 */}
+                <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+                  <div className="grid grid-cols-2 gap-y-4 gap-x-8 text-sm">
                     <div className="flex flex-col gap-1">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wider">用户名</span>
-                      <span className="font-medium">{server.username}</span>
+                      <span className="text-muted-foreground text-xs uppercase tracking-wider">地址</span>
+                      <span className="font-mono font-medium">
+                        {isPanel && server.serverHost
+                          ? `${server.serverHost}:${server.serverPort}`
+                          : `${server.host}:${server.port}`}
+                      </span>
                     </div>
-                  )}
-                  {server.connected && server.position && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wider">坐标</span>
-                      <span className="font-mono">
+                    {!isPanel && server.username && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-muted-foreground text-xs uppercase tracking-wider">用户名</span>
+                        <span className="font-medium">{server.username}</span>
+                      </div>
+                    )}
+                    {server.connected && server.position && (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-muted-foreground text-xs uppercase tracking-wider">坐标</span>
+                        <span className="font-mono">
                         X:{Math.floor(server.position.x)} Y:{Math.floor(server.position.y)} Z:{Math.floor(server.position.z)}
                       </span>
                     </div>
@@ -537,18 +550,8 @@ export function ServerDetailDialog({
                 </div>
               </div>
             </TabsContent>
-
-            {/* 文件管理 - 不使用 TabsContent，直接条件渲染 */}
-            {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
-              <div className="animate-in slide-in-from-bottom-2 duration-300">
-                <FileManager
-                  serverId={server.id}
-                  serverName={server.name || server.id}
-                  compact
-                />
-              </div>
-            )}
           </div>
+          )}
         </Tabs>
       </SheetContent>
     </Sheet>
