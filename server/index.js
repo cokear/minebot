@@ -104,6 +104,11 @@ const systemService = new SystemService();
 const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 
+// Health check endpoint (before all middleware, for Docker health check)
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Auth routes (before auth middleware)
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
