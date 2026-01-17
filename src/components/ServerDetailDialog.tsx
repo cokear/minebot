@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -119,7 +119,15 @@ export function ServerDetailDialog({
   });
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [activeTab, setActiveTab] = useState("control");
+  const contentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // 切换标签时重置滚动位置
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [activeTab]);
 
   // 初始化编辑表单
   useEffect(() => {
@@ -297,7 +305,7 @@ export function ServerDetailDialog({
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
+          <div ref={contentRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6">
             {/* 控制面板 */}
             <TabsContent value="control" className="mt-0 space-y-6 animate-in slide-in-from-bottom-2 duration-300">
               {/* 服务器信息 */}
