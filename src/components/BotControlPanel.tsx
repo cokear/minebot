@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useFileManager } from "@/contexts/FileManagerContext";
 import {
   UserPlus,
   Sword,
@@ -18,8 +17,7 @@ import {
   Power,
   PowerOff,
   Zap,
-  Shield,
-  FolderOpen
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -132,7 +130,6 @@ export function BotControlPanel({
   const [panelUrl, setPanelUrl] = useState(pterodactyl?.url || "");
   const [panelApiKey, setPanelApiKey] = useState(pterodactyl?.apiKey || "");
   const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
-  const { openFileManager } = useFileManager();
 
   // SFTP 配置状态
   const [sftpHost, setSftpHost] = useState(sftpProp?.host || "");
@@ -423,17 +420,6 @@ export function BotControlPanel({
             {loading === "power-restart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
             <span className="text-xs">重启</span>
           </Button>
-          {/* 文件管理按钮 */}
-          <Button
-            size="sm"
-            variant="outline"
-            title="文件管理"
-            disabled={!pterodactyl?.url && !(sftpProp?.host && fileAccessTypeProp === 'sftp')}
-            onClick={() => openFileManager(botId, botName)}
-          >
-            <FolderOpen className="h-4 w-4 mr-1" />
-            <span className="text-xs">文件</span>
-          </Button>
         </div>
         {!pterodactyl?.url && !(sftpHost && fileAccessType === 'sftp') && (
           <p className="text-xs text-muted-foreground">请先在设置中配置翼龙面板或 SFTP 信息</p>
@@ -482,18 +468,6 @@ export function BotControlPanel({
               <span className="text-xs">喊话</span>
             </Button>
           </>
-        )}
-        {/* 文件管理按钮 - 需要翼龙面板或 SFTP 配置 */}
-        {(pterodactyl?.url || (sftpProp?.host && fileAccessTypeProp === 'sftp')) && (
-          <Button
-            size="sm"
-            variant="outline"
-            title="文件管理"
-            onClick={() => openFileManager(botId, botName)}
-          >
-            <FolderOpen className="h-4 w-4 mr-1" />
-            <span className="text-xs">文件</span>
-          </Button>
         )}
         {/* 设置按钮始终可见 */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>

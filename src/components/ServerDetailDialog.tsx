@@ -20,11 +20,13 @@ import {
   Trash,
   Settings,
   Activity,
+  FolderOpen,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { BotControlPanel } from "./BotControlPanel";
 import { BotSettingsPanel } from "./BotSettingsPanel";
+import { FileManager } from "./FileManager";
 
 interface LogEntry {
   id: number;
@@ -283,6 +285,15 @@ export function ServerDetailDialog({
                 <Terminal className="h-4 w-4" />
                 日志
               </TabsTrigger>
+              {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+                <TabsTrigger
+                  value="files"
+                  className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  文件
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
 
@@ -518,6 +529,18 @@ export function ServerDetailDialog({
                 </div>
               </div>
             </TabsContent>
+
+            {/* 文件管理 */}
+            {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+              <TabsContent value="files" className="mt-0 h-full animate-in slide-in-from-bottom-2 duration-300">
+                <div className="h-[calc(100vh-200px)]">
+                  <FileManager
+                    serverId={server.id}
+                    serverName={server.name || server.id}
+                  />
+                </div>
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </SheetContent>
