@@ -178,7 +178,7 @@ export function RenewalPanel() {
 
     // 验证登录模式必填项
     if ((formData.mode === "autoLoginHttp" || formData.mode === "browserClick") &&
-        (!formData.loginUrl || !formData.panelUsername || !formData.panelPassword)) {
+      (!formData.loginUrl || !formData.panelUsername || !formData.panelPassword)) {
       toast({ title: "错误", description: "请填写登录URL、账号和密码", variant: "destructive" });
       return;
     }
@@ -366,14 +366,14 @@ export function RenewalPanel() {
                   添加
                 </Button>
               </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
+            <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0">
+              <DialogHeader className="p-6 pb-2">
                 <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
                 <DialogDescription>
                   配置自动续期请求，保持服务器运行
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
                 {/* 基本信息 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -625,7 +625,8 @@ export function RenewalPanel() {
                   </Collapsible>
                 )}
               </div>
-              <DialogFooter>
+              </div >
+              <DialogFooter className="p-6 pt-2">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   取消
                 </Button>
@@ -854,6 +855,6 @@ export function RenewalPanel() {
           ))
         )}
       </CardContent>
-    </Card>
+    </Card >
   );
 }
