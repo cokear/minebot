@@ -369,6 +369,55 @@ export class RenewalService {
     this.anonymizedProxies.clear();
   }
 
+
+  /**
+   * 处理 Cloudflare Turnstile 验证
+   */
+  async handleCloudflareChallenge(page, id) {
+    try {
+      // 检查是否有 Turnstile iframe
+      const turnstileFrames = await page.$$('iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]');
+
+      if (turnstileFrames.length > 0) {
+        this.log('info', `检测到 ${turnstileFrames.length} 个 Cloudflare 验证框，尝试自动处理...`, id);
+
+        for (const frameElement of turnstileFrames) {
+          try {
+            const frame = await frameElement.contentFrame();
+            if (!frame) continue;
+
+            await this.delay(1000);
+
+            // 尝试查找复选框
+            const checkbox = await frame.$('input[type="checkbox"]') ||
+              await frame.$('.ctp-checkbox-label') ||
+              await frame.$('#challenge-stage'); // 某些情况下点击容器也行
+
+            if (checkbox) {
+              this.log('info', '找到验证复选框，尝试点击...', id);
+              await checkbox.click();
+              await this.delay(3000);
+            } else {
+              // 如果找不到明确的 checkbox，尝试点击 iframe 中心
+              const box = await frameElement.boundingBox();
+              if (box) {
+                this.log('info', '尝试点击验证框中心...', id);
+                await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                await this.delay(3000);
+              }
+            }
+          } catch (e) {
+            this.log('warning', `处理单个验证框失败: ${e.message}`, id);
+          }
+        }
+        return true;
+      }
+    } catch (error) {
+      // 忽略错误，可能不是 CF 页面
+    }
+    return false;
+  }
+
   /**
    * 延迟辅助函数
    */
@@ -1407,9 +1456,17 @@ export class RenewalService {
 
       // 检查是否遇到 CF 验证
       let afterClickContent = await page.content();
+
+      // 尝试处理 Turnstile 验证
+      await this.handleCloudflareChallenge(page, id);
+
       let clickCfWait = 0;
       while ((afterClickContent.includes('checking your browser') || afterClickContent.includes('Just a moment')) && clickCfWait < 15) {
         this.log('info', '续期请求遇到 Cloudflare 验证，等待中...', id);
+
+        // 循环中也尝试处理验证
+        await this.handleCloudflareChallenge(page, id);
+
         await this.delay(2000);
         afterClickContent = await page.content();
         clickCfWait++;
