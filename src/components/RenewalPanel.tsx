@@ -366,7 +366,7 @@ export function RenewalPanel() {
                     添加
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0">
+                <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0 top-[10%] translate-y-0">
                   <DialogHeader className="p-6 pb-2 shrink-0">
                     <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
                     <DialogDescription>
