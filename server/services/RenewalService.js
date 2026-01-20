@@ -7,6 +7,10 @@ import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import proxyChain from 'proxy-chain';
 import os from 'os';
+import fs from 'fs';
+import path from 'path';
+
+const COOKIE_FILE_PATH = path.join(process.cwd(), 'data', 'cookies.json');
 
 // 使用 stealth 插件绑过检测
 puppeteer.use(StealthPlugin());
@@ -27,6 +31,51 @@ export class RenewalService {
 
     // 启动时加载已保存的续期配置
     this.loadSavedRenewals();
+    this.loadCookiesFromDisk();
+  }
+
+  /**
+   * 从磁盘加载 Cookies
+   */
+  loadCookiesFromDisk() {
+    try {
+      if (fs.existsSync(COOKIE_FILE_PATH)) {
+        const data = fs.readFileSync(COOKIE_FILE_PATH, 'utf8');
+        const cookiesJson = JSON.parse(data);
+        // cookiesJson is likely an array of entries or object. 
+        // We stored it as Map entries or object. Let's assume object for easier JSON
+        // Convert object back to Map
+        for (const [id, cookies] of Object.entries(cookiesJson)) {
+          this.cookies.set(id, cookies);
+        }
+        console.log(`[System] 已从磁盘加载 ${this.cookies.size} 个续期配置的 Cookies`);
+      }
+    } catch (error) {
+      console.error('[System] 加载 Cookies 失败:', error.message);
+    }
+  }
+
+  /**
+   * 保存 Cookies 到磁盘
+   */
+  saveCookiesToDisk() {
+    try {
+      // Ensure data dir exists
+      const dataDir = path.dirname(COOKIE_FILE_PATH);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+
+      // Convert Map to Object
+      const cookiesObj = {};
+      for (const [id, cookies] of this.cookies) {
+        cookiesObj[id] = cookies;
+      }
+
+      fs.writeFileSync(COOKIE_FILE_PATH, JSON.stringify(cookiesObj, null, 2), 'utf8');
+    } catch (error) {
+      console.error('[System] 保存 Cookies 失败:', error.message);
+    }
   }
 
   log(type, message, renewalId = null) {
@@ -987,6 +1036,21 @@ export class RenewalService {
       await page.setViewport({ width: 1920, height: 1080 });
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
 
+      // 尝试恢复 Cookies
+      const savedCookies = this.cookies.get(id);
+      if (savedCookies && savedCookies.length > 0) {
+        try {
+          this.log('info', `恢复 ${savedCookies.length} 个已保存的 Cookie...`, id);
+          // 过滤掉无效或过期的 cookie (简单的检查)
+          const validCookies = savedCookies.filter(c => !c.expires || c.expires > Date.now() / 1000);
+          if (validCookies.length > 0) {
+            await page.setCookie(...validCookies);
+          }
+        } catch (e) {
+          this.log('warning', `恢复 Cookie 失败: ${e.message}`, id);
+        }
+      }
+
       // ========== 登录部分 - 复用 autoLoginAndGetCookies 的逻辑 ==========
       // 访问登录页面，等待 Cloudflare 5秒盾
       this.log('info', `访问登录页面: ${loginUrl}`, id);
@@ -1667,10 +1731,30 @@ export class RenewalService {
 
       if (success) {
         this.log('success', '续期成功', id);
+
+        // 成功后保存最新的 Cookie
+        try {
+          const currentCookies = await page.cookies();
+          if (currentCookies && currentCookies.length > 0) {
+            this.cookies.set(id, currentCookies);
+            this.saveCookiesToDisk();
+            this.log('info', '已更新并保存 Cookie', id);
+          }
+        } catch (e) {
+          this.log('warning', `保存 Cookie 失败: ${e.message}`, id);
+        }
+
       } else if (hasError) {
         this.log('error', '续期可能失败，检测到错误提示', id);
       } else {
         this.log('info', '已点击续期按钮，未检测到明确结果', id);
+
+        // 即使未检测到明确成功，只要没有报错，我们也尝试保存 Cookie (可能是已登录状态)
+        try {
+          const currentCookies = await page.cookies();
+          this.cookies.set(id, currentCookies);
+          this.saveCookiesToDisk();
+        } catch (e) { }
       }
       return result;
 
