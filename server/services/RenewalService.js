@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 
 const COOKIE_FILE_PATH = path.join(process.cwd(), 'data', 'cookies.json');
+const SCREENSHOT_DIR = path.join(process.cwd(), 'data', 'screenshots');
 
 // 使用 stealth 插件绑过检测
 puppeteer.use(StealthPlugin());
@@ -1753,6 +1754,22 @@ export class RenewalService {
 
       if (success) {
         this.log('success', '续期成功', id);
+
+        // 截图保存证据
+        try {
+          if (!fs.existsSync(SCREENSHOT_DIR)) {
+            fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+          }
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const screenshotPath = path.join(SCREENSHOT_DIR, `success-${id}-${timestamp}.png`);
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+          this.log('info', `已保存成功截图: ${screenshotPath}`, id);
+
+          // 将截图路径添加到结果中，以便前端可能显示 (可选)
+          result.screenshot = screenshotPath;
+        } catch (e) {
+          this.log('warning', `保存截图失败: ${e.message}`, id);
+        }
 
         // 成功后保存最新的 Cookie
         try {
