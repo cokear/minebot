@@ -1927,7 +1927,6 @@ export class RenewalService {
 
       // 检查结果
       // 检查结果 - 使用 visible text 而不是 HTML source，避免匹配到 class="btn-success" 等
-      const bodyText = await page.evaluate(() => document.body.innerText);
       const finalUrl = page.url();
       this.log('info', `续期后页面 URL: ${finalUrl}`, id);
 
