@@ -373,6 +373,21 @@ export class RenewalService {
     const executablePath = this.getChromePath();
     let actualProxyUrl = proxyUrl;
 
+    // 检查是否已经在运行
+    if (this.browser) {
+      // 检查浏览器是否已断开连接
+      if (!this.browser.isConnected()) {
+        this.browser = null;
+      } else {
+        // 如果请求了代理，但现有浏览器没有代理（或者代理不同），则需要新实例
+        // 简单起见，这里如果 currentBrowser 没有 proxy 且请求 proxy，暂不支持复用
+        // 但目前逻辑是：如果有 proxyUrl，直接 create new instance，不复用 this.browser
+        if (!actualProxyUrl) {
+          return this.browser;
+        }
+      }
+    }
+
     // 如果代理包含认证信息 (user:pass@host)，创建本地匿名代理
     if (proxyUrl && proxyUrl.includes('@')) {
       // 检查是否已经有该代理的匿名映射
@@ -400,10 +415,6 @@ export class RenewalService {
       '--disable-gpu',
       '--window-size=1920,1080'
     ];
-
-    if (useGuestProfile) {
-      commonArgs.push('--guest');
-    }
 
     // 如果指定了代理，每次都创建新的浏览器实例
     if (actualProxyUrl) {
@@ -1010,7 +1021,7 @@ export class RenewalService {
     this.log('info', `开始浏览器点击续期...${browserProxy ? ` (代理: ${browserProxy})` : ''}`, id);
 
     // 如果有代理，创建独立的浏览器实例
-    const browser = await this.getBrowser(browserProxy || null, true);
+    const browser = await this.getBrowser(browserProxy || null);
     const isProxyBrowser = !!browserProxy;
 
     let page;
@@ -2150,8 +2161,8 @@ export class RenewalService {
     let page = null;
 
     try {
-      // 使用 getBrowser 启动，并强制使用访客模式
-      browser = await this.getBrowser(proxyUrl, true); // Pass true for useGuestProfile
+      // 使用 getBrowser 启动
+      browser = await this.getBrowser(proxyUrl);
       page = await browser.newPage();
 
       await page.setViewport({ width: 1280, height: 720 });
