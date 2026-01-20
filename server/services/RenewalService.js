@@ -1187,7 +1187,10 @@ export class RenewalService {
       await page.setUserAgent(userAgent);
 
       // 如果有手动配置的 Cookie，注入它 (优先级高)
-      if (renewal.manualCookies) {
+      // 优先从 options 获取 (用于即时测试)，其次从 renewal 配置获取
+      const manualCookiesStr = options.manualCookies || renewal.manualCookies;
+
+      if (manualCookiesStr) {
         let domain = '';
         try {
           const urlObj = new URL(url);
@@ -1197,7 +1200,7 @@ export class RenewalService {
         }
 
         if (domain) {
-          const cookies = this.parseCookieString(renewal.manualCookies, domain);
+          const cookies = this.parseCookieString(manualCookiesStr, domain);
           if (cookies.length > 0) {
             this.log('info', `注入手动配置的 Cookie (${cookies.length} 个)...`, id);
             await page.setCookie(...cookies);
@@ -1796,6 +1799,8 @@ export class RenewalService {
         throw new Error('找不到续期按钮');
       }
 
+      let clickError = null;
+
       // 点击按钮
       try {
         this.log('info', '正在点击续期按钮...', id);
@@ -1821,13 +1826,15 @@ export class RenewalService {
         while (waitResultCount < maxResultWait) {
           const content = await page.content();
           // 检查是否存在未完成的验证弹窗
-          const isVerifying = content.includes('Renew Server') ||
-            content.includes('正在验证') ||
+          // [修正] 移除 'Renew Server' 纯文本匹配，因为它可能是页面标题或按钮文字，导致永远无法跳出循环
+          // 只匹配明确表示"正在进行"的状态
+          const isVerifying = content.includes('正在验证') ||
             content.includes('checking your browser') ||
             content.includes('Just a moment');
 
+          // 如果没有检测到正在验证，且也没有检测到 explicit success/error，我们假设交互可能已经结束
           if (!isVerifying) {
-            this.log('info', '验证弹窗已消失，继续检查结果...', id);
+            this.log('info', '未检测到验证/加载状态，继续检查结果...', id);
             break;
           }
 
@@ -1841,10 +1848,11 @@ export class RenewalService {
         }
 
         if (waitResultCount >= maxResultWait) {
-          this.log('warning', '验证超时：弹窗长时间未消失，标记为失败', id);
-          throw new Error('验证超时：Renew Server 弹窗未消失');
+          // 只有当确定还在"verify"状态时才报错，但因为上面的 isVerifying 已经放宽，可能不会轻易触发这里
+          this.log('warning', '验证等待结束 (可能是超时)', id);
         }
       } catch (e) {
+        clickError = e;
         this.log('warning', `点击按钮时出错: ${e.message}`, id);
       }
 
@@ -1975,7 +1983,7 @@ export class RenewalService {
       // [新增] 如果点击过程报错(如超时)且没有明确的成功元素显示，强制判负
       if (clickError && !hasSuccessElement) {
         success = false;
-        this.log('warning', `点击过程异常 (${clickError.message})，且未检测到成功元素，标记为失败`, id);
+        this.log('warning', `点击过程异常 (${clickError ? clickError.message : 'unknown'})，且未检测到成功元素，标记为失败`, id);
       }
 
       const result = {
