@@ -1351,6 +1351,20 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));
 });
 
+// 检查 Captcha 余额
+app.post('/api/captcha/balance', async (req, res) => {
+  try {
+    const { key } = req.body;
+    if (!key) {
+      return res.status(400).json({ success: false, error: 'Key is required' });
+    }
+    const result = await renewalService.checkNopechaBalance(key);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on port ${PORT}`);

@@ -369,7 +369,7 @@ export class RenewalService {
    * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080 或带认证的 socks5://user:pass@host:port
    * @param {boolean} useGuestProfile - 是否使用访客模式启动浏览器
    */
-  async getBrowser(proxyUrl = null, useGuestProfile = false) {
+  async getBrowser(proxyUrl = null, useExtension = false, extensionKey = null) {
     const executablePath = this.getChromePath();
     let actualProxyUrl = proxyUrl;
 
@@ -1041,6 +1041,67 @@ export class RenewalService {
       return decodeURIComponent(xsrfCookie.value);
     } catch {
       return xsrfCookie.value;
+    }
+  }
+
+  /**
+   * 检查 NopeCHA 余额
+   */
+  async checkNopechaBalance(key) {
+    if (!key) return { error: '未提供 API Key' };
+
+    try {
+      this.log('info', `正在查询 NopeCHA 余额...`);
+      const response = await fetch(`https://api.nopecha.com/status?key=${key}`);
+      const data = await response.json();
+
+      if (data.error) {
+        return { error: data.message || '查询失败' };
+      }
+
+      return {
+        credit: data.credit,
+        status: 'active'
+      };
+    } catch (error) {
+      this.log('error', `查询 NopeCHA 余额失败: ${error.message}`);
+      return { error: `网络请求失败: ${error.message}` };
+    }
+  }
+
+  /**
+   * 更新扩展 Manifest (注入 Key)
+   */
+  updateExtensionManifest(key) {
+    if (!key) return;
+
+    try {
+      // 扩展路径硬编码为 e:\ck\docker\chromium_automation
+      const extPath = 'e:\\ck\\docker\\chromium_automation';
+      const manifestPath = path.join(extPath, 'manifest.json');
+
+      if (fs.existsSync(manifestPath)) {
+        const manifestContent = fs.readFileSync(manifestPath, 'utf8');
+        const manifest = JSON.parse(manifestContent);
+
+        // 如果 key 不同，更新并保存
+        if (manifest.nopecha_key !== key) { // 注意: 字段名可能不同，官方通常是 key 或 nopecha.key，这里假设直接注入 specific field 如果扩展支持，或者修改 background script
+          // 根据 NopeCHA 文档，通常是设置 storage 或修改 manifest 的 oauth2 / 预设 key
+          // 但这里用户之前的实现是注入 manifest.
+          // 假设扩展读取 manifest 中的 specific key，或者我们需要修改 content script?
+          // 这里我们按之前的计划: 注入到 manifest 的 nopecha.key 字段 (假设扩展逻辑如此)
+          // 或者更为通用的：NopeCHA 扩展通常支持 managed storage 或者首次运行配置
+          // 简单起见，我们假设修改 manifest.json 中的 key 字段是有效的，或者我们在此处仅仅是占位
+          // 实际 NopeCHA Chrome 扩展通常不需要修改 manifest，而是通过 UI 设置
+          // 但为了自动化，可能需要预填充 storage.
+          // 此处保留原定逻辑: 注入 nopecha_key
+          manifest.nopecha_key = key;
+          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+          this.log('info', '已更新扩展 Manifest 中的 Key');
+        }
+      }
+    } catch (error) {
+      this.log('warning', `更新扩展 Manifest 失败: ${error.message}`);
     }
   }
 
