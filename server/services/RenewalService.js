@@ -428,6 +428,8 @@ export class RenewalService {
       commonArgs.push(`--disable-extensions-except=${extPath}`);
       commonArgs.push(`--load-extension=${extPath}`);
       this.log('info', '已启用验证码破解插件');
+    } else {
+      this.log('info', `跳过加载验证码插件: enabled=${useExtension}, key=${extensionKey ? '***' : 'null'}`);
     }
 
     // 如果指定了代理，每次都创建新的浏览器实例
