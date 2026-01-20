@@ -1605,23 +1605,58 @@ export class RenewalService {
       await this.delay(2000);
 
       // 检查结果
-      const finalContent = await page.content();
+      // 检查结果 - 使用 visible text 而不是 HTML source，避免匹配到 class="btn-success" 等
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      const lowerText = bodyText.toLowerCase();
+
       const finalUrl = page.url();
-      this.log('info', `续期后页面: ${finalUrl}`, id);
+      this.log('info', `续期后页面 URL: ${finalUrl}`, id);
 
-      const success = finalContent.includes('success') ||
-        finalContent.includes('Success') ||
-        finalContent.includes('成功') ||
-        finalContent.includes('renewed') ||
-        finalContent.includes('Renewed') ||
-        finalContent.includes('extended') ||
-        finalContent.includes('Extended');
+      // 成功判定：检查可见文本中的关键词
+      // 排除掉仅仅是 button label 的情况(通常比较短)，这里我们看全页文本
+      const successKeywords = ['renewed', 'extended', 'success', '成功', '已续期', '已延长'];
+      const errorKeywords = ['failed', 'error', '失败', '错误', 'wrong', 'incorrect'];
 
-      const hasError = finalContent.includes('error') ||
-        finalContent.includes('Error') ||
-        finalContent.includes('failed') ||
-        finalContent.includes('Failed') ||
-        finalContent.includes('失败');
+      // 检查是否有明确的成功提示元素 (Alerts, Toasts)
+      const hasSuccessElement = await page.evaluate(() => {
+        const successSelectors = [
+          '.alert-success',
+          '.toast-success',
+          '.text-success',
+          '[class*="success"]', // 宽泛匹配 class 包含 success 的可见元素
+          '.swal2-success' // SweetAlert2
+        ];
+
+        for (const selector of successSelectors) {
+          const els = document.querySelectorAll(selector);
+          for (const el of els) {
+            // 必须是可见的，并且包含相关文字
+            if (el.offsetParent !== null && (el.innerText.includes('success') || el.innerText.includes('成功'))) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
+
+      let success = hasSuccessElement;
+
+      // 如果没有找到明确的元素，检查文本
+      if (!success) {
+        // 简单的文本包含检查，但排除只是 "Renew" 按钮文案的情况
+        // 这里我们可以尝试匹配由于 class 造成的误判已经排除了（因为只看 innerText）
+        // 但仍需小心 "Renewal Success Rate" 这种描述性文字
+        // 暂时简单处理：只要文本里有 success 且没有 error
+        success = successKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+      }
+
+      const hasError = errorKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+
+      // 二次确认：如果有 error 关键字，即使有 success 也认为是失败 (e.g. "Renewal failed, please try again")
+      if (hasError) {
+        success = false;
+        this.log('warning', '检测到错误关键词，标记为失败', id);
+      }
 
       const result = {
         success: !hasError,
