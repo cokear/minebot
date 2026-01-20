@@ -214,9 +214,9 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Apply auth middleware to all /api routes except auth
+// Apply auth middleware to all /api routes except auth and screenshots
 app.use('/api', (req, res, next) => {
-  if (req.path.startsWith('/auth/')) {
+  if (req.path.startsWith('/auth/') || req.path.startsWith('/screenshots/')) {
     return next();
   }
   return authService.authMiddleware()(req, res, next);
