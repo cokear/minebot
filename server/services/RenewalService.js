@@ -1788,8 +1788,9 @@ export class RenewalService {
       this.log('info', `续期后页面 URL: ${finalUrl}`, id);
 
       // 成功判定：检查可见文本中的关键词
-      // 排除掉仅仅是 button label 的情况(通常比较短)，这里我们看全页文本
-      const successKeywords = ['renewed', 'extended', 'success', '成功', '已续期', '已延长'];
+      // [修正] 移除 'renewed' 这种容易误判的通用词 (如 "Last renewed at...")
+      // 只保留明确的成功提示词
+      const successKeywords = ['server renewed', 'successfully renewed', 'success', '成功', '已续期', '已延长'];
       const errorKeywords = ['failed', 'error', '失败', '错误', 'wrong', 'incorrect'];
 
       // 检查是否有明确的成功提示元素 (Alerts, Toasts)
@@ -1806,7 +1807,7 @@ export class RenewalService {
           const els = document.querySelectorAll(selector);
           for (const el of els) {
             // 必须是可见的，并且包含相关文字
-            if (el.offsetParent !== null && (el.innerText.includes('success') || el.innerText.includes('成功'))) {
+            if (el.offsetParent !== null && (el.innerText.toLowerCase().includes('success') || el.innerText.includes('成功'))) {
               return true;
             }
           }
@@ -1818,23 +1819,29 @@ export class RenewalService {
 
       // 如果没有找到明确的元素，检查文本
       if (!success) {
-        // 简单的文本包含检查，但排除只是 "Renew" 按钮文案的情况
-        // 这里我们可以尝试匹配由于 class 造成的误判已经排除了（因为只看 innerText）
-        // 但仍需小心 "Renewal Success Rate" 这种描述性文字
-        // 暂时简单处理：只要文本里有 success 且没有 error
-        success = successKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+        // [修正] 只有当没有发生点击错误时，才尝试宽泛文本匹配
+        // 如果刚才的 try-catch 捕获了错误 (如超时)，则不应依赖文本猜测
+        if (!clickError) {
+          success = successKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+        }
       }
 
       const hasError = errorKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
 
-      // 二次确认：如果有 error 关键字，即使有 success 也认为是失败 (e.g. "Renewal failed, please try again")
+      // 二次确认：如果有 error 关键字，即使有 success 也认为是失败
       if (hasError) {
         success = false;
         this.log('warning', '检测到错误关键词，标记为失败', id);
       }
 
+      // [新增] 如果点击过程报错(如超时)且没有明确的成功元素显示，强制判负
+      if (clickError && !hasSuccessElement) {
+        success = false;
+        this.log('warning', `点击过程异常 (${clickError.message})，且未检测到成功元素，标记为失败`, id);
+      }
+
       const result = {
-        success: !hasError,
+        success: !hasError && success, // 只有 success 为 true 且 no error 才是 true
         message: success ? '续期成功' : (hasError ? '续期可能失败' : '已点击续期按钮'),
         response: success ? '检测到成功提示' : (hasError ? '检测到错误提示' : '已执行点击操作'),
         timestamp: new Date().toISOString()
