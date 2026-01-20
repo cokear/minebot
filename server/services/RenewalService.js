@@ -1809,6 +1809,12 @@ export class RenewalService {
         if (renewButton) {
           try {
             // 1. 尝试获取位置并模拟鼠标点击 (主要方式)
+            // 先尝试滚动到视图中
+            try {
+              await renewButton.scrollIntoView();
+              await this.delay(300);
+            } catch (e) { }
+
             const box = await renewButton.boundingBox();
             if (box) {
               this.log('info', `按钮位置: (${Math.round(box.x)}, ${Math.round(box.y)})，模拟鼠标点击...`, id);
