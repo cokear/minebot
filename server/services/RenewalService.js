@@ -1132,6 +1132,8 @@ export class RenewalService {
     const useCaptcha = options.captcha?.enabled ?? renewal.captcha?.enabled;
     const captchaKey = options.captcha?.key || renewal.captcha?.key;
 
+    this.log('info', `Captcha配置: Enabled=${useCaptcha}, Key=${captchaKey ? (captchaKey.substring(0, 5) + '...') : 'None'}`, id);
+
     if (!loginUrl || !panelUsername || !panelPassword) {
       throw new Error('浏览器点击续期需要配置登录URL、账号和密码');
     }
