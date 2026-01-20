@@ -874,6 +874,7 @@ export class RenewalService {
       // 检查是否还在登录页
       const stillOnLoginPage = currentUrl.includes('/login') ||
         currentUrl.includes('/auth') ||
+        currentUrl.includes('/sign-in') ||
         currentContent.includes('Sign in') ||
         currentContent.includes('Login') ||
         currentContent.includes('登录');
@@ -1613,14 +1614,23 @@ export class RenewalService {
         throw new Error('找不到续期按钮');
       }
 
-      // 点击续期按钮
-      this.log('info', '点击续期按钮...', id);
-      await renewButton.click();
+      // 点击按钮
+      try {
+        this.log('info', '正在点击续期按钮...', id);
+        // 尝试多种方式点击
+        await page.evaluate((selector) => {
+          const btn = document.querySelector(selector);
+          if (btn) btn.click();
+        }, renewButtonSelector || 'button.btn-primary');
 
-      // 等待续期请求完成，可能会有 CF 5秒盾
-      const waitTime = clickWaitTime || 5000;
-      this.log('info', `等待续期请求完成 (${waitTime}ms)...`, id);
-      await this.delay(waitTime);
+        // 处理可能的 Turnstile 验证
+        await this.handleTurnstile(page, id);
+
+        // 等待操作结果
+        await this.delay(parseInt(clickWaitTime) || 5000);
+      } catch (e) {
+        this.log('warning', `点击按钮时出错: ${e.message}`, id);
+      }
 
       // 检查是否遇到 CF 验证
       let afterClickContent = await page.content();
@@ -1843,13 +1853,66 @@ export class RenewalService {
           // 但这会影响其他任务。暂定：共享浏览器仅在 cleanup 时关闭，或者
           // 这里我们只关闭 page。如果 closeBrowser=true 且是共享浏览器，我们可能不应该关闭整个 browser，除非没有其他页面了
 
-          // 简单策略：如果 closeBrowser=true，我们关闭 page (上面已做)，
-          // 共享浏览器通常常驻。如果用户想完全释放，应该在全局层面控制。
-          // 但如果用户希望"每次干净启动"，他应该用代理模式或者我们在代码里加逻辑
-
           // 暂时：共享浏览器不在此处关闭 browser，只关闭 page。
         }
       }
+    }
+  }
+
+  /**
+   * 处理 Cloudflare Turnstile 验证
+   * 策略：查找 iframe -> 计算坐标 -> 模拟鼠标真实点击
+   */
+  async handleTurnstile(page, id) {
+    try {
+      this.log('info', '检查是否存在 Turnstile 验证...', id);
+
+      // 等待 iframe 出现，最多等待 5 秒
+      const iframeSelector = 'iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]';
+      try {
+        await page.waitForSelector(iframeSelector, { visible: true, timeout: 5000 });
+      } catch (e) {
+        this.log('info', '未检测到显式 Turnstile 验证框，继续...', id);
+        return; // 没找到就直接返回
+      }
+
+      this.log('info', '检测到 Turnstile 验证框，尝试自动点击...', id);
+
+      // 获取 iframe 元素
+      const iframeElement = await page.$(iframeSelector);
+      if (!iframeElement) return;
+
+      // 获取 iframe 的位置和大小
+      const boundingBox = await iframeElement.boundingBox();
+      if (!boundingBox) {
+        this.log('warning', '无法获取 Turnstile 验证框位置', id);
+        return;
+      }
+
+      // 计算中心点坐标
+      const x = boundingBox.x + boundingBox.width / 2;
+      const y = boundingBox.y + boundingBox.height / 2;
+
+      this.log('info', `Turnstile 验证框位置: (${Math.round(x)}, ${Math.round(y)})，准备点击...`, id);
+
+      // 模拟人类鼠标移动和点击
+      try {
+        await page.mouse.move(x, y, { steps: 10 }); // 平滑移动
+        await this.delay(100 + Math.random() * 200);
+        await page.mouse.down();
+        await this.delay(50 + Math.random() * 100);
+        await page.mouse.up();
+
+        this.log('info', '点击动作已完成，等待验证结果...', id);
+
+        // 点击后等待一段时间，让验证生效
+        await this.delay(3000);
+      } catch (clickError) {
+        this.log('warning', `模拟点击 Turnstile 失败: ${clickError.message}`, id);
+      }
+
+    } catch (error) {
+      this.log('warning', `处理 Turnstile 验证时出错: ${error.message}`, id);
     }
   }
 
