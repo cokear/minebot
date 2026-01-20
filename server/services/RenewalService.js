@@ -1861,11 +1861,14 @@ export class RenewalService {
           // 只匹配明确表示"正在进行"的状态
           const isVerifying = content.includes('正在验证') ||
             content.includes('checking your browser') ||
-            content.includes('Just a moment');
+            content.includes('Just a moment') ||
+            content.includes('Verify you are human') ||
+            content.includes('security verification') ||
+            (content.includes('Renew Server') && content.includes('Cancel')); // 只有当模态框出现（带Cancel按钮）时才算验证中
 
           // 如果没有检测到正在验证，且也没有检测到 explicit success/error，我们假设交互可能已经结束
           if (!isVerifying) {
-            this.log('info', '未检测到验证/加载状态，继续检查结果...', id);
+            this.log('info', '未检测到验证/加载状态 (如 "Verify you are human")，继续检查结果...', id);
             break;
           }
 
@@ -2155,13 +2158,23 @@ export class RenewalService {
 
       // 模拟人类鼠标移动和点击
       try {
-        await page.mouse.move(x, y, { steps: 10 }); // 平滑移动
-        await this.delay(100 + Math.random() * 200);
+        // 第一次尝试：点击中心
+        await page.mouse.move(x, y, { steps: 25 }); // 更慢的移动
+        await this.delay(200 + Math.random() * 300);
         await page.mouse.down();
-        await this.delay(50 + Math.random() * 100);
+        await this.delay(100 + Math.random() * 150);
         await page.mouse.up();
 
-        this.log('info', '点击动作已完成，等待验证结果...', id);
+        // 如果有 offset，尝试点击左侧复选框区域 (通常在左侧)
+        // 很多时候 Turnstile 是一个长条，checkbox 在左边
+        await this.delay(500);
+        const checkboxX = x - boundingBox.width / 2 + 30; // 假设左边距 30px
+        await page.mouse.move(checkboxX, y, { steps: 10 });
+        await this.delay(100);
+        await page.mouse.click(checkboxX, y);
+
+        this.log('info', '点击动作已完成 (尝试了中心和左侧)，等待验证结果...', id);
+
 
         // 点击后等待一段时间，让验证生效
         await this.delay(3000);
