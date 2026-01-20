@@ -1667,11 +1667,13 @@ export class RenewalService {
           if (btn) btn.click();
         }, renewButtonSelector || 'button.btn-primary');
 
+        // 等待操作结果 (根据用户反馈，先等待再检测 Turnstile)
+        const waitTime = parseInt(clickWaitTime) || 5000;
+        this.log('info', `点击后等待 ${waitTime}ms...`, id);
+        await this.delay(waitTime);
+
         // 处理可能的 Turnstile 验证
         await this.handleTurnstile(page, id);
-
-        // 等待操作结果
-        await this.delay(parseInt(clickWaitTime) || 5000);
       } catch (e) {
         this.log('warning', `点击按钮时出错: ${e.message}`, id);
       }
