@@ -1875,7 +1875,7 @@ export class RenewalService {
             isVerifying = true;
 
             // 如果启用了验证码插件，交给插件处理，不再手动点击
-            if (this.useCaptcha && this.captchaKey) {
+            if (useCaptcha && captchaKey) {
               this.log('info', '检测到验证码，等待插件自动解决...', id);
               // 我们仍然可以检查 iframe 是否存在来确认状态，但不要去点击
               // 简单的等待
