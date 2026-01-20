@@ -2130,20 +2130,45 @@ export class RenewalService {
     try {
       this.log('info', '检查是否存在 Turnstile 验证...', id);
 
-      // 等待 iframe 出现，最多等待 5 秒
-      const iframeSelector = 'iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]';
-      try {
-        await page.waitForSelector(iframeSelector, { visible: true, timeout: 5000 });
-      } catch (e) {
-        this.log('info', '未检测到显式 Turnstile 验证框，继续...', id);
-        return; // 没找到就直接返回
+      // 调试：打印所有 iframe
+      const frames = page.frames();
+      const frameUrls = frames.map(f => f.url());
+      if (frameUrls.some(u => u.includes('cloudflare') || u.includes('turnstile'))) {
+        this.log('info', `发现相关 iframe: ${frameUrls.filter(u => u.includes('cloudflare') || u.includes('turnstile')).join(', ')}`, id);
       }
 
-      this.log('info', '检测到 Turnstile 验证框，尝试自动点击...', id);
+      // 尝试1: 标准选择器
+      let iframeSelector = 'iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]';
+      let iframeElement = await page.$(iframeSelector);
 
-      // 获取 iframe 元素
-      const iframeElement = await page.$(iframeSelector);
-      if (!iframeElement) return;
+      // 尝试2: 如果没找到，尝试通过 Frame 对象反向查找 ElementHandle (Puppeteer 复杂操作，简化为尝试宽泛选择器)
+      if (!iframeElement) {
+        // 尝试查找 shadow dom 中的 iframe (如果不跨域)
+        // 或者尝试更宽泛的选择器，配合 URL 检查
+        const allIframes = await page.$$('iframe');
+        for (const frame of allIframes) {
+          const src = await page.evaluate(el => el.src, frame);
+          if (src && (src.includes('challenges.cloudflare.com') || src.includes('turnstile'))) {
+            iframeElement = frame;
+            this.log('info', `通过遍历找到 Turnstile iframe: ${src.substring(0, 50)}...`, id);
+            break;
+          }
+        }
+      }
+
+      if (!iframeElement) {
+        // 再次检查 frame list，如果 frame 存在但 element 找不到，可能是嵌套问题
+        const hasFrame = frames.some(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
+        if (hasFrame) {
+          this.log('warning', '检测到 Turnstile Frame 存在，但无法获取 DOM 元素 (可能是 Shadow DOM 或跨域限制)', id);
+        } else {
+          this.log('info', '未检测到 Turnstile 验证框 (无相关Frame)', id);
+        }
+        return;
+      }
+
+      // 既然找到了 Element，就不需要再 wait 了，直接处理
+      this.log('info', '检测到 Turnstile 验证框，尝试自动点击...', id);
 
       // 获取 iframe 的位置和大小
       const boundingBox = await iframeElement.boundingBox();
