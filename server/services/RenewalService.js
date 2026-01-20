@@ -407,13 +407,18 @@ export class RenewalService {
       }
     }
 
+    // [配置] 加载本地自动化插件 (FreeGameHost 自动续期 - 包含 Turnstile 验证)
+    const extPath = 'e:\\ck\\docker\\freegamehost\\chrome-extension';
+
     const commonArgs = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--disable-gpu',
-      '--window-size=1920,1080'
+      '--window-size=1920,1080',
+      `--disable-extensions-except=${extPath}`,
+      `--load-extension=${extPath}`
     ];
 
     // 如果指定了代理，每次都创建新的浏览器实例
