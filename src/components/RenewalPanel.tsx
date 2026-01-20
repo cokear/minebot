@@ -86,6 +86,11 @@ interface RenewalFormData {
 
   // 浏览器代理配置（browserClick 模式）
   browserProxy: string;
+
+  // 高级配置
+  closeBrowser: boolean;
+  afkMode: boolean;
+  clickWaitTime: number;
 }
 
 const defaultFormData: RenewalFormData = {
@@ -104,6 +109,9 @@ const defaultFormData: RenewalFormData = {
   panelPassword: "",
   renewButtonSelector: "",
   browserProxy: "",
+  closeBrowser: true,
+  afkMode: false,
+  clickWaitTime: 5000,
 };
 
 export function RenewalPanel() {
@@ -219,6 +227,9 @@ export function RenewalPanel() {
         panelPassword: formData.panelPassword,
         renewButtonSelector: formData.renewButtonSelector,
         browserProxy: formData.browserProxy,
+        closeBrowser: formData.closeBrowser,
+        afkMode: formData.afkMode,
+        clickWaitTime: formData.clickWaitTime,
       };
 
       if (editingId) {
@@ -274,6 +285,9 @@ export function RenewalPanel() {
       panelPassword: renewal.panelPassword || "",
       renewButtonSelector: renewal.renewButtonSelector || "",
       browserProxy: renewal.browserProxy || "",
+      closeBrowser: (renewal as any).closeBrowser !== false,
+      afkMode: (renewal as any).afkMode || false,
+      clickWaitTime: (renewal as any).clickWaitTime || 5000,
     });
     setEditingId(renewal.id);
     setDialogOpen(true);
@@ -554,6 +568,44 @@ export function RenewalPanel() {
                           <p className="text-xs text-muted-foreground">
                             支持 HTTP/HTTPS/SOCKS4/SOCKS5 代理，如需使用 hy2 请先配置本地代理客户端
                           </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-3">
+                          <div className="flex items-center justify-between space-x-2">
+                            <Label htmlFor="close-browser" className="flex flex-col gap-1 cursor-pointer">
+                              <span>完成后关闭浏览器</span>
+                              <span className="font-normal text-xs text-muted-foreground">任务完成后清理资源</span>
+                            </Label>
+                            <Switch
+                              id="close-browser"
+                              checked={formData.closeBrowser}
+                              onCheckedChange={(checked) => setFormData({ ...formData, closeBrowser: checked })}
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between space-x-2">
+                            <Label htmlFor="afk-mode" className="flex flex-col gap-1 cursor-pointer">
+                              <span>挂机模式 (AFK)</span>
+                              <span className="font-normal text-xs text-muted-foreground">保持页面开启常驻</span>
+                            </Label>
+                            <Switch
+                              id="afk-mode"
+                              checked={formData.afkMode}
+                              onCheckedChange={(checked) => setFormData({ ...formData, afkMode: checked })}
+                            />
+                          </div>
+
+                          <div className="col-span-2 space-y-2">
+                            <Label className="text-xs">点击后等待时间 (毫秒)</Label>
+                            <Input
+                              type="number"
+                              min="1000"
+                              step="1000"
+                              value={formData.clickWaitTime}
+                              onChange={(e) => setFormData({ ...formData, clickWaitTime: parseInt(e.target.value) || 5000 })}
+                            />
+                            <p className="text-xs text-muted-foreground">如果服务器响应较慢，可以适当增加此时间</p>
+                          </div>
                         </div>
                       </div>
                     )}

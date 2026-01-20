@@ -23,6 +23,7 @@ export class RenewalService {
     this.maxLogsPerRenewal = 50;
     this.maxGlobalLogs = 100;
     this.anonymizedProxies = new Map(); // 匿名代理映射 (原始URL -> 本地URL)
+    this.pages = new Map(); // id -> page (挂机模式下保持的页面实例)
 
     // 启动时加载已保存的续期配置
     this.loadSavedRenewals();
@@ -146,6 +147,11 @@ export class RenewalService {
       // 浏览器代理配置（browserClick 模式）
       browserProxy: renewalConfig.browserProxy || '',  // 格式: socks5://127.0.0.1:1080
 
+      // 高级配置
+      closeBrowser: renewalConfig.closeBrowser !== false, // 默认 true (完成后关闭)
+      afkMode: renewalConfig.afkMode || false, // 挂机模式 (默认关闭)
+      clickWaitTime: parseInt(renewalConfig.clickWaitTime) || 5000, // 点击后等待时间 (默认 5000ms)
+
       // 状态
       lastRun: null,
       lastResult: null
@@ -252,6 +258,19 @@ export class RenewalService {
       clearInterval(timer);
       this.timers.delete(id);
       this.log('info', `停止续期定时器`, id);
+
+      // 如果有挂机的页面，也一并清理
+      if (this.pages.has(id)) {
+        const page = this.pages.get(id);
+        try {
+          if (!page.isClosed()) {
+            page.close().catch(() => { });
+            this.log('info', `清理挂机页面`, id);
+          }
+        } catch (e) { }
+        this.pages.delete(id);
+      }
+
       return true;
     }
     return false;
@@ -351,6 +370,9 @@ export class RenewalService {
    * 关闭浏览器
    */
   async closeBrowser() {
+    // 清理所有挂机页面
+    this.pages.clear();
+
     if (this.browser) {
       await this.browser.close();
       this.browser = null;
@@ -914,7 +936,7 @@ export class RenewalService {
    * 使用浏览器点击续期按钮
    */
   async browserClickRenew(renewal) {
-    const { id, url, renewButtonSelector, loginUrl, panelUsername, panelPassword, browserProxy } = renewal;
+    const { id, url, renewButtonSelector, loginUrl, panelUsername, panelPassword, browserProxy, closeBrowser, afkMode, clickWaitTime } = renewal;
 
     if (!loginUrl || !panelUsername || !panelPassword) {
       throw new Error('浏览器点击续期需要配置登录URL、账号和密码');
@@ -925,7 +947,40 @@ export class RenewalService {
     // 如果有代理，创建独立的浏览器实例
     const browser = await this.getBrowser(browserProxy || null);
     const isProxyBrowser = !!browserProxy;
-    const page = await browser.newPage();
+
+    let page;
+    let reusedPage = false;
+
+    // 检查是否有可复用的页面 (挂机模式)
+    if (afkMode && this.pages.has(id)) {
+      const existingPage = this.pages.get(id);
+      if (existingPage && !existingPage.isClosed()) {
+        try {
+          // 检查页面是否还关联着浏览器
+          if (existingPage.browser().isConnected()) {
+            page = existingPage;
+            reusedPage = true;
+            this.log('info', '复用已有的挂机页面', id);
+
+            // 激活标签页
+            try { await page.bringToFront(); } catch (e) { }
+          } else {
+            this.pages.delete(id);
+          }
+        } catch (e) {
+          this.pages.delete(id); // 页面可能已失效
+        }
+      } else {
+        this.pages.delete(id);
+      }
+    }
+
+    if (!page) {
+      page = await browser.newPage();
+      if (afkMode) {
+        this.pages.set(id, page);
+      }
+    }
 
     try {
       // 设置视口和 User-Agent
@@ -964,6 +1019,31 @@ export class RenewalService {
       // 如果已登录，跳过登录流程，直接进入续期
       if (alreadyLoggedIn) {
         this.log('info', `检测到已登录状态，跳过登录步骤 (当前页面: ${currentUrl})`, id);
+      } else if (reusedPage) {
+        // 如果是复用的页面但未登录，可能登录失效，刷新页面重试
+        this.log('warning', '复用页面未检测到登录状态，尝试刷新...', id);
+        await page.reload({ waitUntil: 'networkidle2' });
+        await this.delay(3000);
+        // 继续下面的登录流程
+
+        // 重新检查是否登录
+        currentUrl = page.url();
+        const stillNotLoggedIn = !currentUrl.includes('/login') && !currentUrl.includes('/auth') && !currentUrl.includes('/sign-in');
+
+        if (stillNotLoggedIn) {
+          this.log('info', '刷新后检测到已登录', id);
+        } else {
+          // 需要重新登录
+          this.log('info', '刷新后仍需登录', id);
+          // 这里会继续执行下面的登录代码
+        }
+      }
+
+      // 再次检查 (代码结构稍微调整以支持 reusedPage 的情况)
+      const shouldLogin = !alreadyLoggedIn && (page.url().includes('/login') || page.url().includes('/auth') || page.url().includes('/sign-in') || page.url().includes('signin'));
+
+      if (!shouldLogin) {
+        // considering logged in
       } else {
         // ========== 未登录，执行登录流程 ==========
         this.log('info', '未登录，开始登录流程...', id);
@@ -1451,8 +1531,9 @@ export class RenewalService {
       await renewButton.click();
 
       // 等待续期请求完成，可能会有 CF 5秒盾
-      this.log('info', '等待续期请求完成...', id);
-      await this.delay(5000);
+      const waitTime = clickWaitTime || 5000;
+      this.log('info', `等待续期请求完成 (${waitTime}ms)...`, id);
+      await this.delay(waitTime);
 
       // 检查是否遇到 CF 验证
       let afterClickContent = await page.content();
@@ -1567,10 +1648,46 @@ export class RenewalService {
         timestamp: new Date().toISOString()
       };
     } finally {
-      await page.close();
-      // 如果是代理浏览器实例，需要关闭整个浏览器
+      // 策略：
+      // 1. 如果是 AFK 模式，且不强制关闭浏览器 -> 保留 Page，不关闭 Browser
+      // 2. 如果强制关闭浏览器 -> 关闭 Page，关闭 Browser (即使是 AFK)
+      // 3. 普通模式 -> 关闭 Page，如果不强制关闭浏览器，保留 Browser (为了复用)
+
+      // 注意：isProxyBrowser 为 true 时，通常每个续期都是独立浏览器实例
+      // 如果 !afkMode，我们通常关闭 page
+
+      const shouldKeepPage = afkMode && !closeBrowser;
+
+      if (!shouldKeepPage) {
+        try {
+          if (!page.isClosed()) await page.close();
+        } catch (e) { }
+        this.pages.delete(id); // 从 map 中移除
+      } else {
+        this.log('info', '挂机模式生效：保留页面不关闭', id);
+      }
+
+      // 处理浏览器实例关闭
       if (isProxyBrowser) {
-        await browser.close();
+        // 如果是代理浏览器，且不保留页面，或者强制关闭
+        if (!shouldKeepPage || closeBrowser) {
+          try { await browser.close(); } catch (e) { }
+        }
+      } else {
+        // 共享浏览器实例
+        if (closeBrowser) {
+          // 强制关闭共享浏览器? 
+          // 如果这是全局配置的话，但 closeBrowser 是 per-renewal 配置
+          // 对于共享浏览器，closeBrowser=true 可能意味着 "本次任务结束后关闭共享浏览器" 
+          // 但这会影响其他任务。暂定：共享浏览器仅在 cleanup 时关闭，或者
+          // 这里我们只关闭 page。如果 closeBrowser=true 且是共享浏览器，我们可能不应该关闭整个 browser，除非没有其他页面了
+
+          // 简单策略：如果 closeBrowser=true，我们关闭 page (上面已做)，
+          // 共享浏览器通常常驻。如果用户想完全释放，应该在全局层面控制。
+          // 但如果用户希望"每次干净启动"，他应该用代理模式或者我们在代码里加逻辑
+
+          // 暂时：共享浏览器不在此处关闭 browser，只关闭 page。
+        }
       }
     }
   }
