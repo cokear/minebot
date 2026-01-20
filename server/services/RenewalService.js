@@ -2141,18 +2141,39 @@ export class RenewalService {
       let iframeSelector = 'iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]';
       let iframeElement = await page.$(iframeSelector);
 
-      // 尝试2: 如果没找到，尝试通过 Frame 对象反向查找 ElementHandle (Puppeteer 复杂操作，简化为尝试宽泛选择器)
+      // 尝试2: 深度遍历 Shadow DOM 查找
       if (!iframeElement) {
-        // 尝试查找 shadow dom 中的 iframe (如果不跨域)
-        // 或者尝试更宽泛的选择器，配合 URL 检查
-        const allIframes = await page.$$('iframe');
-        for (const frame of allIframes) {
-          const src = await page.evaluate(el => el.src, frame);
-          if (src && (src.includes('challenges.cloudflare.com') || src.includes('turnstile'))) {
-            iframeElement = frame;
-            this.log('info', `通过遍历找到 Turnstile iframe: ${src.substring(0, 50)}...`, id);
-            break;
+        this.log('info', '标准选择器未找到，尝试深度遍历 Shadow DOM...', id);
+        try {
+          const handle = await page.evaluateHandle(() => {
+            function findIframe(root) {
+              // 1. 检查当前 root 下的 iframe
+              const iframes = root.querySelectorAll('iframe');
+              for (const iframe of iframes) {
+                if (iframe.src.includes('challenges.cloudflare.com') || iframe.src.includes('turnstile')) {
+                  return iframe;
+                }
+              }
+
+              // 2. 遍历所有子元素的 shadowRoot
+              const items = root.querySelectorAll('*');
+              for (const item of items) {
+                if (item.shadowRoot) {
+                  const found = findIframe(item.shadowRoot);
+                  if (found) return found;
+                }
+              }
+              return null;
+            }
+            return findIframe(document);
+          });
+
+          if (handle.asElement()) {
+            iframeElement = handle.asElement();
+            this.log('info', '通过 Shadow DOM 深度搜索找到 iframe!', id);
           }
+        } catch (e) {
+          this.log('warning', `Shadow DOM 搜索出错: ${e.message}`, id);
         }
       }
 
@@ -2160,7 +2181,7 @@ export class RenewalService {
         // 再次检查 frame list，如果 frame 存在但 element 找不到，可能是嵌套问题
         const hasFrame = frames.some(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
         if (hasFrame) {
-          this.log('warning', '检测到 Turnstile Frame 存在，但无法获取 DOM 元素 (可能是 Shadow DOM 或跨域限制)', id);
+          this.log('warning', '检测到 Turnstile Frame 存在，但无法获取 DOM 元素 (可能是闭合 Shadow DOM 或极深层嵌套)', id);
         } else {
           this.log('info', '未检测到 Turnstile 验证框 (无相关Frame)', id);
         }
