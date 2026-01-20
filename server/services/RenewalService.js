@@ -1072,8 +1072,8 @@ export class RenewalService {
       if (savedCookies && savedCookies.length > 0) {
         try {
           this.log('info', `恢复 ${savedCookies.length} 个已保存的 Cookie...`, id);
-          // 过滤掉无效或过期的 cookie (简单的检查)
-          const validCookies = savedCookies.filter(c => !c.expires || c.expires > Date.now() / 1000);
+          // 过滤掉无效或过期的 cookie (保留 session cookies：expires 为空、0 或 -1)
+          const validCookies = savedCookies.filter(c => !c.expires || c.expires <= 0 || c.expires > Date.now() / 1000);
           if (validCookies.length > 0) {
             await page.setCookie(...validCookies);
           }
