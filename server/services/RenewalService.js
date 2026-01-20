@@ -2066,43 +2066,40 @@ export class RenewalService {
         timestamp: new Date().toISOString()
       };
 
-      // 截图保存证据 (无论是成功还是未知结果，都截图以便分析)
-      if (success || !hasError) {
-        try {
-          if (!fs.existsSync(SCREENSHOT_DIR)) {
-            fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-          }
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const type = success ? 'success' : 'ambiguous';
-          const screenshotPath = path.join(SCREENSHOT_DIR, `${type}-${id}-${timestamp}.png`);
-          await page.screenshot({ path: screenshotPath, fullPage: true });
-          this.log('info', `已保存${success ? '成功' : '状态'}截图: ${screenshotPath}`, id);
-
-          const screenshotFilename = path.basename(screenshotPath);
-          result.screenshotUrl = `/api/screenshots/${screenshotFilename}`;
-
-          if (success) {
-            this.log('success', '续期成功', id);
-            // 成功后保存最新的 Cookie
-            try {
-              const currentCookies = await page.cookies();
-              if (currentCookies && currentCookies.length > 0) {
-                this.cookies.set(id, currentCookies);
-                this.saveCookiesToDisk();
-                this.log('info', '已更新并保存 Cookie', id);
-              }
-            } catch (e) {
-              this.log('warning', `保存 Cookie 失败: ${e.message}`, id);
-            }
-          } else {
-            this.log('warning', '已点击，但未检测到明确成功/失败信号，请查看截图', id);
-          }
-        } catch (e) {
-          this.log('warning', `保存截图失败: ${e.message}`, id);
+      // 截图保存证据 (无论是成功、失败还是未知结果，都截图以便分析)
+      try {
+        if (!fs.existsSync(SCREENSHOT_DIR)) {
+          fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
         }
-      } else if (hasError) {
-        this.log('error', '续期可能失败，检测到错误提示', id);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const type = success ? 'success' : (hasError ? 'failure' : 'ambiguous');
+        const screenshotPath = path.join(SCREENSHOT_DIR, `${type}-${id}-${timestamp}.png`);
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        this.log('info', `已保存状态截图 (${type}): ${screenshotPath}`, id);
+
+        const screenshotFilename = path.basename(screenshotPath);
+        result.screenshotUrl = `/api/screenshots/${screenshotFilename}`;
+
+        if (success) {
+          this.log('success', '续期成功', id);
+          // 成功后保存最新的 Cookie
+          try {
+            const currentCookies = await page.cookies();
+            if (currentCookies && currentCookies.length > 0) {
+              this.cookies.set(id, currentCookies);
+              this.saveCookiesToDisk();
+              this.log('info', '已更新并保存 Cookie', id);
+            }
+          } catch (e) {
+            this.log('warning', `保存 Cookie 失败: ${e.message}`, id);
+          }
+        } else {
+          this.log('warning', '已点击，但未检测到明确成功/失败信号，请查看截图', id);
+        }
+      } catch (e) {
+        this.log('warning', `保存截图失败: ${e.message}`, id);
       }
+
 
       return result;
 

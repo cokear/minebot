@@ -976,17 +976,21 @@ export function RenewalPanel() {
                           暂无日志
                         </div>
                       ) : (
-                        renewalLogs[renewal.id].slice().reverse().map((log) => (
-                          <div
-                            key={log.id}
-                            className={`${log.type === 'error' ? 'text-red-500' :
-                              log.type === 'success' ? 'text-green-500' :
-                                'text-muted-foreground'
-                              }`}
-                          >
-                            <span className="opacity-60">[{log.timestamp}]</span> {log.message}
-                          </div>
-                        ))
+                        renewalLogs[renewal.id]
+                          .slice()
+                          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                          .reverse()
+                          .map((log) => (
+                            <div
+                              key={log.id}
+                              className={`${log.type === 'error' ? 'text-red-500' :
+                                log.type === 'success' ? 'text-green-500' :
+                                  'text-muted-foreground'
+                                }`}
+                            >
+                              <span className="opacity-60">[{log.timestamp}]</span> {log.message}
+                            </div>
+                          ))
                       )}
                     </div>
                   </div>
