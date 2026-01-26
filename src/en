@@ -1,0 +1,199 @@
+// ==UserScript==
+// @name         ValtoriaCloud Auto Renew (v3.0 Final Ultimate)
+// @namespace    http://tampermonkey.net/
+// @version      3.0
+// @description  全功能版：24h时间监控 + 拟人化点击 + 状态机持久化 + 后台防休眠
+// @author       Gemini
+// @match        https://console.overnode.fr/server/manage?id=*
+// @grant        GM_addStyle
+// @grant        GM_setValue
+// @grant        GM_getValue
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // --- 1. 核心配置 ---
+    const CONFIG = {
+        storageKey: 'valtoria_v3_final',
+        threshold: 24,           // 剩余时间小于 24 小时触发
+        checkInterval: 5000,     // 扫描频率（后台会自动降频，不影响）
+        refreshCooldown: 300000, // 24h内若无按钮，每5分钟刷新页面一次
+        btnText: 'Renew Now'
+    };
+
+    // --- 2. 状态机初始化 ---
+    let data = JSON.parse(localStorage.getItem(CONFIG.storageKey)) || {
+        isPaused: false,
+        logs: [],
+        lastRefresh: 0,
+        status: 'idle', // idle, renewing
+        retryCount: 0
+    };
+
+    // --- 3. UI 界面构建 ---
+    GM_addStyle(`
+        #vt-panel {
+            position: fixed; bottom: 10px; right: 10px; width: 380px;
+            background: #111; color: #ddd; z-index: 999999;
+            border: 1px solid #333; border-radius: 10px; padding: 15px;
+            font-family: 'Segoe UI', Consolas, monospace; font-size: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+        }
+        #vt-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 10px; }
+        .vt-tag { background: #6f42c1; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 10px; }
+        .vt-status-box { background: #1e1e1e; padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #6f42c1; }
+        .vt-btn { cursor: pointer; border: none; padding: 6px 15px; border-radius: 4px; font-weight: bold; transition: 0.3s; }
+        .btn-pause { background: #e67e22; color: #fff; }
+        .btn-resume { background: #27ae60; color: #fff; }
+        #vt-logs { height: 160px; overflow-y: auto; background: #000; border: 1px solid #222; padding: 8px; margin-top: 10px; border-radius: 4px; line-height: 1.5; }
+        .log-time { color: #666; font-size: 10px; margin-right: 5px; }
+        .log-info { color: #3498db; }
+        .log-success { color: #2ecc71; font-weight: bold; }
+        .log-warn { color: #f1c40f; }
+        .log-error { color: #e74c3c; }
+    `);
+
+    const panel = document.createElement('div');
+    panel.id = 'vt-panel';
+    panel.innerHTML = `
+        <div id="vt-header">
+            <span><span class="vt-tag">V3.0 FINAL</span> 自动续期面板</span>
+            <span id="vt-running-indicator" style="color:#2ecc71;">● RUNNING</span>
+        </div>
+        <div class="vt-status-box">
+            <div>⏰ 剩余时间: <span id="vt-time-val" style="color:#f1c40f; font-weight:bold;">--</span></div>
+            <div>📡 引擎状态: <span id="vt-engine-status">检查中...</span></div>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button id="vt-toggle" class="vt-btn ${data.isPaused ? 'btn-resume' : 'btn-pause'}">${data.isPaused ? '恢复运行' : '暂停脚本'}</button>
+            <button id="vt-reset" class="vt-btn" style="background:#444; color:#ccc;">清空日志</button>
+        </div>
+        <div id="vt-logs"></div>
+    `;
+    document.body.appendChild(panel);
+
+    // --- 4. 工具函数 ---
+    function save() { localStorage.setItem(CONFIG.storageKey, JSON.stringify(data)); }
+
+    function addLog(msg, type = 'info') {
+        const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        data.logs.unshift({ time, msg, type });
+        if (data.logs.length > 50) data.logs.pop();
+        save();
+        renderLogs();
+    }
+
+    function renderLogs() {
+        document.getElementById('vt-logs').innerHTML = data.logs.map(l =>
+            `<div><span class="log-time">[${l.time}]</span><span class="log-${l.type}">${l.msg}</span></div>`
+        ).join('');
+    }
+
+    async function sleep(min, max) {
+        const ms = Math.floor(Math.random() * (max - min + 1) + min);
+        return new Promise(r => setTimeout(r, ms));
+    }
+
+    // --- 5. 核心逻辑引擎 ---
+    function parseRemainingTime() {
+        const text = document.body.innerText;
+        // 匹配 47h 59m remaining 这种格式
+        const match = text.match(/(\d+)h\s+(\d+)m\s+remaining/i);
+        if (match) return { hours: parseInt(match[1]), minutes: parseInt(match[2]) };
+        return null;
+    }
+
+    async function mainEngine() {
+        if (data.isPaused) {
+            document.getElementById('vt-running-indicator').innerText = "○ PAUSED";
+            document.getElementById('vt-running-indicator').style.color = "#888";
+            return;
+        }
+
+        const timeData = parseRemainingTime();
+        const displayTime = document.getElementById('vt-time-val');
+        const displayStatus = document.getElementById('vt-engine-status');
+
+        // 第一步：探测按钮 (只要按钮在，说明满足续期条件)
+        const btn = Array.from(document.querySelectorAll('button, a'))
+                         .find(el => el.textContent.includes(CONFIG.btnText) && el.offsetWidth > 0);
+
+        if (btn) {
+            displayStatus.innerText = "发现按钮，准备点击";
+            displayStatus.style.color = "#2ecc71";
+
+            // 拟人化延迟 2-5 秒
+            addLog("🎯 探测到 Renew Now，拟人化等待中...", "info");
+            await sleep(2000, 5000);
+
+            addLog("🚀 执行点击操作！", "success");
+            btn.click();
+
+            // 点击后锁定状态，等待页面刷新
+            data.isPaused = true;
+            save();
+            setTimeout(() => { location.reload(); }, 5000);
+            return;
+        }
+
+        // 第二步：如果没按钮，解析时间文本
+        if (timeData) {
+            displayTime.innerText = `${timeData.hours}h ${timeData.minutes}m`;
+
+            if (timeData.hours < CONFIG.threshold) {
+                displayStatus.innerText = "进入 24h 窗口，等待按钮...";
+                displayStatus.style.color = "#f1c40f";
+
+                // 长时间按钮不出则刷新
+                const now = Date.now();
+                if (now - data.lastRefresh > CONFIG.refreshCooldown) {
+                    addLog("⏳ 时间达标但按钮未见，尝试刷新页面...", "warn");
+                    data.lastRefresh = now;
+                    save();
+                    location.reload();
+                }
+            } else {
+                displayStatus.innerText = "时间充裕，静默监控中";
+                displayStatus.style.color = "#888";
+            }
+        } else {
+            displayTime.innerText = "未检测到时间";
+            displayStatus.innerText = "正在扫描页面...";
+        }
+    }
+
+    // --- 6. 事件绑定 ---
+    document.getElementById('vt-toggle').addEventListener('click', function() {
+        data.isPaused = !data.isPaused;
+        this.innerText = data.isPaused ? '恢复运行' : '暂停脚本';
+        this.className = `vt-btn ${data.isPaused ? 'btn-resume' : 'btn-pause'}`;
+        addLog(data.isPaused ? "⏸ 脚本手动暂停" : "▶️ 脚本恢复工作", "info");
+        save();
+    });
+
+    document.getElementById('vt-reset').addEventListener('click', () => {
+        data.logs = [];
+        save();
+        renderLogs();
+    });
+
+    // --- 7. 防休眠补丁 (针对后台运行) ---
+    // 通过微小的 DOM 活动尝试维持标签页活跃
+    setInterval(() => {
+        if (!data.isPaused) {
+            const dot = document.createElement('div');
+            dot.style.cssText = "width:1px;height:1px;position:fixed;bottom:0;right:0;opacity:0.01;";
+            document.body.appendChild(dot);
+            setTimeout(() => dot.remove(), 1000);
+        }
+    }, 30000);
+
+    // --- 8. 启动脚本 ---
+    renderLogs();
+    addLog("✅ Valtoria v3.0 Final 加载成功", "info");
+
+    // 启动主循环
+    setInterval(mainEngine, CONFIG.checkInterval);
+
+})();
