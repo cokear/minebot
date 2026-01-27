@@ -1,0 +1,128 @@
+// ==UserScript==
+// @name         Zampto Auto Renew (v3.8 Debug)
+// @namespace    http://tampermonkey.net/
+// @version      3.8
+// @description  调试专用：每2分钟执行一次，流程为：倒计时结束 -> 刷新网页 -> 等待15秒 -> 点击续期 -> 验证结果
+// @author       Gemini
+// @match        https://dash.zampto.net/server?id=2574*
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // --- 1. 调试配置 ---
+    const CONFIG = {
+        storageKey: 'zampto_v3_8_debug',
+        btnText: "Renew Server",
+        renewInterval: 2 * 60 * 1000, // 【调试】每 2 分钟循环一次
+        warmupDuration: 15 * 1000     // 【调试】刷新后仅等待 15 秒即点击
+    };
+
+    // --- 2. 状态管理 ---
+    let data = JSON.parse(localStorage.getItem(CONFIG.storageKey)) || {
+        nextRunTime: 0,
+        status: 'idle', 
+        logs: [],
+        lastExpiryMinutes: 0,
+        warmupEndTime: 0
+    };
+
+    // --- 3. 基础工具 ---
+    function simulateClick(element) {
+        if (!element) return;
+        ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(eventType => {
+            const event = new MouseEvent(eventType, { bubbles: true, cancelable: true, view: window });
+            element.dispatchEvent(event);
+        });
+    }
+
+    function getCleanExpiryMinutes() {
+        const elements = Array.from(document.querySelectorAll('p, div, span, li'));
+        const target = elements.find(el => el.textContent.includes('Expiry') && !el.textContent.includes('function') && el.innerText.length < 150);
+        if (!target) return 0;
+        const text = target.innerText;
+        let total = 0;
+        text.replace(/(\d+)\s*day/g, (_, d) => total += d * 1440);
+        text.replace(/(\d+)\s*h/g, (_, h) => total += h * 60);
+        text.replace(/(\d+)\s*m/g, (_, m) => total += parseInt(m));
+        return total;
+    }
+
+    function getExpiryDisplay() {
+        const elements = Array.from(document.querySelectorAll('p, div, span, li'));
+        const target = elements.find(el => el.textContent.includes('Expiry') && !el.textContent.includes('function'));
+        return target ? target.innerText.replace('Expiry (Next Renewal):', '').trim() : "获取中...";
+    }
+
+    // --- 4. UI 面板 ---
+    const panel = document.createElement('div');
+    panel.style = "position:fixed;bottom:10px;right:10px;width:420px;background:#202020;color:#ccc;z-index:999999;border:2px solid #ff9800;padding:12px;font-family:'Consolas', monospace;font-size:12px;box-shadow: 0 0 20px rgba(0,0,0,0.9);border-radius:6px;";
+    
+    panel.innerHTML = `
+        <div style="border-bottom:1px solid #444;margin-bottom:8px;padding-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:bold;color:#ff9800;font-size:14px;">🛠️ Zampto Debug (v3.8)</span>
+            <button id="kb-hide" style="background:none;border:none;color:#666;cursor:pointer;">[-]</button>
+        </div>
+        <div id="kb-content">
+            <div id="kb-status" style="margin-bottom:10px;color:#fff;font-size:13px;background:#333;padding:8px;border-radius:4px;border-left:4px solid #ff9800;">初始化...</div>
+            <div style="margin-bottom:10px;display:flex;gap:10px;">
+                <button id="kb-reset" style="background:#d32f2f;color:white;border:none;padding:6px 15px;cursor:pointer;border-radius:4px;font-weight:bold;">重置调试</button>
+            </div>
+            <div id="kb-logs" style="height:300px;overflow-y:auto;border:1px solid #333;padding:8px;background:#000;border-radius:4px;line-height:1.4;"></div>
+        </div>
+    `;
+    document.body.appendChild(panel);
+
+    function log(msg, color = "#aaa") {
+        const time = new Date().toLocaleTimeString();
+        data.logs.unshift(`<div style="color:${color};margin-bottom:4px;border-bottom:1px dashed #333;padding-bottom:2px;"><span style="color:#555">[${time}]</span> ${msg}</div>`);
+        if (data.logs.length > 50) data.logs.pop();
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
+        renderLogs();
+    }
+    
+    function renderLogs() { const el = document.getElementById('kb-logs'); if(el) el.innerHTML = data.logs.join(''); }
+    function updateStatus(text, borderColor = "#ff9800") { 
+        const el = document.getElementById('kb-status');
+        if(el) { el.innerHTML = text; el.style.borderLeftColor = borderColor; }
+    }
+
+    // --- 5. 核心逻辑流程 ---
+
+    // 阶段A: 倒计时结束，执行刷新
+    function startRefreshSequence() {
+        log("⏰ 2分钟调试周期结束", "#ff9800");
+        log("🔄 准备刷新页面...", "#ff9800");
+        
+        data.status = 'warmup';
+        // 刷新后等待15秒
+        data.warmupEndTime = Date.now() + CONFIG.warmupDuration; 
+        
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
+        setTimeout(() => location.reload(), 1000);
+    }
+
+    // 阶段B: 刷新归来，等待15秒让按钮加载
+    function processWarmup() {
+        const now = Date.now();
+        const diff = data.warmupEndTime - now;
+
+        if (diff > 0) {
+            const s = Math.floor(diff / 1000);
+            updateStatus(`🔥 页面加载缓冲中... ${s}秒 后点击`, "#fbc02d");
+            return;
+        }
+
+        log("✅ 缓冲结束，准备点击", "#2196f3");
+        executeClick();
+    }
+
+    // 阶段C: 执行点击
+    async function executeClick() {
+        data.lastExpiryMinutes = getCleanExpiryMinutes();
+        data.status = 'checking';
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
+
+        log(`📊 点击前时间: ${getExpiryDisplay()}`, "#ccc");
+        const btn = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent.includes(CONFIG.
