@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Zampto Auto Renew (v3.6 Debug Mod)
+// @name         Zampto Auto Renew (v4.0 Stable Debug)
 // @namespace    http://tampermonkey.net/
-// @version      3.6.1-Debug
-// @description  基于v3.6修改：2分钟循环 + 刷新预热逻辑，用于故障排查
+// @version      4.0
+// @description  完整功能版：2分钟循环 + 刷新预热 + 自动识别网页刷新结果 + 精准时间比对
 // @author       Gemini
 // @match        https://dash.zampto.net/server?id=2574*
 // @grant        none
@@ -11,40 +11,39 @@
 (function() {
     'use strict';
 
-    // --- 1. 全局配置 (调试模式) ---
+    // --- 1. 全局配置 ---
     const CONFIG = {
-        storageKey: 'zampto_v3_6_debug_mod',
+        storageKey: 'zampto_v4_0_full',
         btnText: "Renew Server",
-        renewInterval: 2 * 60 * 1000,  // 【调试】改为 2 分钟循环
-        warmupDuration: 15 * 1000      // 【调试】刷新后等待 15 秒再点击
+        renewInterval: 2 * 60 * 1000,    // 【调试】2分钟执行一次
+        warmupDuration: 15 * 1000,       // 【预热】刷新后等待 15秒 再点击
+        fallbackReload: 30 * 1000        // 【保险】如果点击后30秒网页没自动刷新，脚本强制刷新查结果
     };
 
-    // --- 2. 状态读取 ---
-    // 状态流转: idle (倒计时) -> warmup (刷新后等待) -> checking (点击后验证) -> idle
+    // --- 2. 状态管理 ---
+    // status 状态流转: 
+    // idle (倒计时) -> pre_refresh (准备刷新) -> warmup (刷新归来等待点击) -> validating (点击后等待自动刷新验证)
     let data = JSON.parse(localStorage.getItem(CONFIG.storageKey)) || {
         nextRunTime: 0,
         status: 'idle', 
         logs: [],
         lastExpiryMinutes: 0,
-        warmupEndTime: 0 // 新增：记录预热结束时间
+        warmupEndTime: 0,
+        validateStartTime: 0
     };
 
-    // --- 3. 核心工具函数 ---
+    // --- 3. 核心工具函数 (保留所有功能) ---
 
-    // 模拟真实鼠标点击流程
+    // 模拟点击
     function simulateClick(element) {
         if (!element) return;
         ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(eventType => {
-            const event = new MouseEvent(eventType, {
-                bubbles: true,
-                cancelable: true,
-                view: window
-            });
+            const event = new MouseEvent(eventType, { bubbles: true, cancelable: true, view: window });
             element.dispatchEvent(event);
         });
     }
 
-    // 提取并计算剩余分钟数
+    // 精准读取剩余时间 (分钟数)
     function getCleanExpiryMinutes() {
         const elements = Array.from(document.querySelectorAll('p, div, span, li'));
         const target = elements.find(el => el.textContent.includes('Expiry') && !el.textContent.includes('function') && el.innerText.length < 150);
@@ -58,29 +57,29 @@
         return total;
     }
 
-    // 获取显示用的时间文本
+    // 获取显示的文本时间
     function getExpiryDisplay() {
         const elements = Array.from(document.querySelectorAll('p, div, span, li'));
         const target = elements.find(el => el.textContent.includes('Expiry') && !el.textContent.includes('function'));
         return target ? target.innerText.replace('Expiry (Next Renewal):', '').trim() : "获取中...";
     }
 
-    // --- 4. UI 面板构建 (保持 v3.6 原样) ---
+    // --- 4. UI 面板 (完整版) ---
     const panel = document.createElement('div');
-    panel.style = "position:fixed;bottom:10px;right:10px;width:420px;background:#0f0f0f;color:#ccc;z-index:999999;border:1px solid #444;padding:12px;font-family:'Consolas', monospace;font-size:12px;box-shadow: 0 0 20px rgba(0,0,0,0.9);border-radius:6px;";
+    panel.style = "position:fixed;bottom:10px;right:10px;width:450px;background:#121212;color:#e0e0e0;z-index:999999;border:1px solid #333;padding:12px;font-family:'Consolas', monospace;font-size:12px;box-shadow: 0 0 25px rgba(0,0,0,0.8);border-radius:8px;";
     
     panel.innerHTML = `
-        <div style="border-bottom:1px solid #444;margin-bottom:8px;padding-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-weight:bold;color:#ff9800;font-size:14px;">🛠️ Zampto Debug (v3.6 Mod)</span>
-            <button id="kb-hide" style="background:none;border:none;color:#666;cursor:pointer;font-size:14px;">[-]</button>
+        <div style="border-bottom:1px solid #333;margin-bottom:10px;padding-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-weight:bold;color:#4caf50;font-size:14px;">🛠️ Zampto v4.0 (Full Logic)</span>
+            <button id="kb-hide" style="background:none;border:none;color:#666;cursor:pointer;">[-]</button>
         </div>
         <div id="kb-content">
-            <div id="kb-status" style="margin-bottom:10px;color:#fff;font-size:13px;background:#262626;padding:8px;border-radius:4px;border-left:4px solid #ff9800;">正在载入...</div>
+            <div id="kb-status" style="margin-bottom:10px;color:#fff;font-size:13px;background:#262626;padding:10px;border-radius:4px;border-left:5px solid #4caf50;">初始化...</div>
             <div style="margin-bottom:10px;display:flex;gap:10px;">
-                <button id="kb-reset" style="background:#d32f2f;color:white;border:none;padding:6px 15px;cursor:pointer;border-radius:4px;font-weight:bold;">重置并运行</button>
-                <button id="kb-pause" style="background:#fbc02d;color:black;border:none;padding:6px 15px;cursor:pointer;border-radius:4px;font-weight:bold;">暂停</button>
+                <button id="kb-reset" style="background:#d32f2f;color:white;border:none;padding:6px 15px;cursor:pointer;border-radius:4px;font-weight:bold;">⚠️ 重置一切</button>
+                <button id="kb-check" style="background:#1976d2;color:white;border:none;padding:6px 15px;cursor:pointer;border-radius:4px;font-weight:bold;">🔍 读取时间测试</button>
             </div>
-            <div id="kb-logs" style="height:400px;overflow-y:auto;border:1px solid #333;padding:8px;background:#000;border-radius:4px;line-height:1.4;"></div>
+            <div id="kb-logs" style="height:350px;overflow-y:auto;border:1px solid #333;padding:8px;background:#000;border-radius:4px;line-height:1.5;"></div>
         </div>
     `;
     document.body.appendChild(panel);
@@ -94,153 +93,168 @@
         renderLogs();
     }
     
-    function renderLogs() {
-         const logDiv = document.getElementById('kb-logs');
-         if(logDiv) logDiv.innerHTML = data.logs.join('');
-    }
-
-    function updateStatus(text, borderColor = "#a78bfa") { 
+    function renderLogs() { const el = document.getElementById('kb-logs'); if(el) el.innerHTML = data.logs.join(''); }
+    function updateStatus(text, borderColor = "#4caf50") { 
         const el = document.getElementById('kb-status');
-        if(el) {
-            el.innerHTML = text; 
-            el.style.borderLeftColor = borderColor;
-        }
+        if(el) { el.innerHTML = text; el.style.borderLeftColor = borderColor; }
     }
 
-    // --- 5. 核心业务逻辑 ---
+    // --- 5. 核心逻辑引擎 ---
 
-    // 逻辑 A: 启动刷新流程 (倒计时结束后触发)
-    function startRefreshSequence() {
-        log("⏰ 倒计时结束，执行刷新预热...", "#ff9800");
+    // [逻辑1] 倒计时结束，执行预刷新
+    function startCycle() {
+        log("⏰ 周期结束，准备刷新页面以获取新Token...", "#ff9800");
         data.status = 'warmup';
-        // 设定预热结束时间
+        // 设定预热结束时间 (现在 + 15秒)
         data.warmupEndTime = Date.now() + CONFIG.warmupDuration;
         localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
-        
-        // 执行刷新
         location.reload();
     }
 
-    // 逻辑 B: 预热等待 (刷新归来后触发)
+    // [逻辑2] 刷新归来，执行预热等待
     function processWarmup() {
         const now = Date.now();
         const diff = data.warmupEndTime - now;
 
         if (diff > 0) {
-            const s = Math.floor(diff / 1000);
-            updateStatus(`🔥 页面预热中... ${s}秒 后点击`, "#fbc02d");
+            const s = Math.ceil(diff / 1000);
+            updateStatus(`🔥 网页预热中... 请勿操作 (${s}秒)`, "#ffc107");
             return;
         }
 
         // 预热结束，执行点击
-        log("✅ 预热完成，开始寻找按钮", "#4caf50");
-        executeRenew();
+        log("✅ 预热完毕，开始读取时间并点击", "#4caf50");
+        executeClick();
     }
 
-    // 逻辑 C: 执行点击动作
-    async function executeRenew() {
-        // 1. 记录状态
+    // [逻辑3] 点击按钮
+    function executeClick() {
+        // 1. 读取当前时间 (作为基准)
+        const currentDisplay = getExpiryDisplay();
         const minutes = getCleanExpiryMinutes();
-        data.lastExpiryMinutes = minutes; 
-        data.status = 'checking'; // 标记为"检查中"
-        localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
-
-        log(`🖱️ 准备点击... (当前: ${getExpiryDisplay()})`, "#2196f3");
         
-        // 2. 找按钮
+        if (minutes === 0) {
+            log("⚠️ 未能读取到时间，可能页面未加载完全，重试...", "#f44336");
+            return; // 下一秒主循环会再次尝试调用 processWarmup -> executeClick
+        }
+
+        data.lastExpiryMinutes = minutes;
+        
+        // 2. 寻找按钮
         const btn = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent.includes(CONFIG.btnText));
         
         if (btn) {
-            updateStatus("🚀 正在点击，等待结果...", "#2196f3");
-            simulateClick(btn);
-            log("🚀 已触发点击，等待响应...", "#ba68c8");
+            log(`📊 点击前时间: ${currentDisplay}`, "#2196f3");
+            log("🖱️ 正在点击续期按钮...", "#ba68c8");
             
-            // 调试模式下：如果网页没自动刷新，10秒后我们强制自检
-            await new Promise(r => setTimeout(r, 10000));
-            log("👀 10秒已过，执行自检...", "#90caf9");
-            checkResult();
+            // 3. 改变状态为 validating (等待自动刷新)
+            data.status = 'validating';
+            data.validateStartTime = Date.now(); // 记录开始验证的时间
+            localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
+
+            updateStatus("🚀 点击动作已发送，等待网页自动刷新...", "#ba68c8");
+            simulateClick(btn);
+            
+            // 注意：这里我们不主动刷新，因为你说网页会自动刷新
+            // 但为了防止网页卡死不刷新，主循环里加了一个超时检查
         } else {
             log("❌ 未找到按钮，5秒后重试", "#f44336");
-            // 保持在 warmup 状态或退回 idle 稍后重试，这里选择退回 idle 快速重试
-            data.status = 'idle';
-            data.nextRunTime = Date.now() + 5000; 
+            // 延长预热时间5秒，让它继续找
+            data.warmupEndTime = Date.now() + 5000;
             localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
         }
     }
 
-    // 逻辑 D: 验证结果
+    // [逻辑4] 验证结果 (在网页自动刷新归来后执行)
     function checkResult() {
         const currentMinutes = getCleanExpiryMinutes();
         const displayTime = getExpiryDisplay();
 
-        // 调试模式：无论是否成功，都记录日志，并进入下一个 2分钟 循环
+        // 刚加载可能读不到时间，给它一点宽容度
+        if (currentMinutes === 0) {
+            updateStatus("🔎 页面刚加载，正在寻找时间元素...", "#2196f3");
+            return;
+        }
+
+        // 成功判断：时间增加了，或者时间大于1.5天(2000分钟)
         if (currentMinutes > data.lastExpiryMinutes || currentMinutes > 2000) {
-            log(`✅ [调试] 续期成功! 新时间: ${displayTime}`, "#4caf50");
+            log(`✅ 续期成功! 新时间: ${displayTime}`, "#4caf50");
+            updateStatus("✅ 任务完成，等待下个循环", "#4caf50");
         } else {
-            log(`⚠️ [调试] 时间未变 (当前: ${displayTime})`, "#ff9800");
+            log(`⚠️ 时间未变 (当前: ${displayTime})，可能点击未生效`, "#ff9800");
         }
         
-        // 进入下一轮
-        log("⏳ 进入下一轮 2分钟 倒计时", "#fff");
+        // 无论成功失败，进入下一轮倒计时
+        log("⏳ 2分钟调试倒计时开始...", "#fff");
         data.status = 'idle';
         data.nextRunTime = Date.now() + CONFIG.renewInterval;
         localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
-        updateStatus("✅ 等待下一轮循环", "#4caf50");
     }
 
-    // --- 6. 主循环引擎 ---
-    let isPaused = false;
-    
-    // 每 1 秒检查一次状态
+    // --- 6. 主循环 (每秒执行) ---
     setInterval(() => {
-        if (isPaused) { updateStatus("🔴 脚本已暂停", "#f44336"); return; }
-        
         const now = Date.now();
-        
-        // 状态 1: 刚刷新回来，处于预热期
+
+        // 状态A: 刚刷新回来 (Warmup)
         if (data.status === 'warmup') {
             processWarmup();
             return;
         }
 
-        // 状态 2: 刚点完，处于验证期
-        if (data.status === 'checking') {
-            updateStatus("🔎 正在验证结果...", "#2196f3");
-            checkResult();
+        // 状态B: 刚点击完 (Validating) - 等待网页自动刷新
+        if (data.status === 'validating') {
+            // 这里有两种情况：
+            // 1. 网页还没刷新 -> 我们显示等待状态
+            // 2. 网页已经刷新了 -> 脚本重新加载时，会立即进入这里
+
+            // 检查是否刚刚重新加载 (通过 performance API 判断页面运行时间很短)
+            if (performance.now() < 5000) {
+                // 页面刚启动且状态是 validating，说明是自动刷新回来了！
+                checkResult();
+            } else {
+                // 页面运行很久了状态还是 validating，说明点击后网页没自动刷新
+                const waitTime = now - data.validateStartTime;
+                updateStatus(`🚀 等待网页自动刷新... (${Math.floor(waitTime/1000)}s)`, "#ba68c8");
+                
+                // 保险丝：如果超过 30秒 还没刷新，手动刷新一次去查结果
+                if (waitTime > CONFIG.fallbackReload) {
+                    log("⚠️ 等待自动刷新超时，强制手动刷新查结果...", "#ff9800");
+                    location.reload();
+                }
+            }
             return;
         }
 
-        // 状态 3: 倒计时中
+        // 状态C: 倒计时 (Idle)
         if (data.status === 'idle') {
             if (now < data.nextRunTime) {
                 const diff = data.nextRunTime - now;
-                const h = Math.floor(diff / 3600000);
                 const m = Math.floor((diff % 3600000) / 60000);
                 const s = Math.floor((diff % 60000) / 1000);
-                updateStatus(`⏳ [调试] 下次续期: ${m}分 ${s}秒`);
+                updateStatus(`⏳ [调试] 下次续期: ${m}分 ${s}秒`, "#2196f3");
             } else {
-                // 时间到了！先去刷新
-                startRefreshSequence();
+                startCycle();
             }
         }
 
     }, 1000);
 
-    // --- 7. 事件绑定 ---
+    // --- 7. 事件交互 ---
     renderLogs();
     
-    // 重置按钮
     document.getElementById('kb-reset').onclick = () => {
-        if(confirm("重置将清空日志并重新开始调试。确定吗？")) {
-            data = { nextRunTime: 0, status: 'idle', logs: [], lastExpiryMinutes: 0, warmupEndTime: 0 };
+        if(confirm("确定要重置脚本状态吗？")) {
+            data = { nextRunTime: 0, status: 'idle', logs: [], lastExpiryMinutes: 0, warmupEndTime: 0, validateStartTime: 0 };
             localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
             location.reload();
         }
     };
     
-    document.getElementById('kb-pause').onclick = function() {
-        isPaused = !isPaused;
-        this.innerText = isPaused ? "恢复" : "暂停";
+    document.getElementById('kb-check').onclick = () => {
+        const t = getExpiryDisplay();
+        const m = getCleanExpiryMinutes();
+        log(`🔍 手动测试读取: ${t} (分钟数: ${m})`, "#03a9f4");
+        alert(`读取到的时间:\n${t}\n解析分钟: ${m}`);
     };
     
     document.getElementById('kb-hide').onclick = () => {
@@ -251,6 +265,6 @@
         btn.innerText = isHidden ? "[-]" : "[+]";
     };
 
-    log("🛠️ v3.6 调试版已就绪 (2分循环+刷新预热)", "#fff");
+    log("🤖 v4.0 调试版启动 (完整功能+自动刷新处理)", "#fff");
 
 })();
