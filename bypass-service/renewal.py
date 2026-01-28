@@ -37,11 +37,25 @@ class RenewalHandler:
                 except:
                     pass
 
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] 准备启动浏览器...", flush=True)
         log(f"开始任务: {url} (模式: {action_type})")
         
         try:
-            # UC Mode 启动浏览器
-            with SB(uc=True, test=True, locale="en", proxy=proxy, incognito=True) as sb:
+            # UC Mode 启动浏览器 - 优化 Docker 参数
+            # 移除 incognito 避免部分权限问题，添加重试机制
+            sb_config = {
+                "uc": True,
+                "test": True,
+                "locale": "en",
+                "proxy": proxy,
+                "headless": False,  # Docker 中有 Xvfb，这里设为 False 以适配 UC 模式
+                "ad_block_on": False,
+            }
+            if proxy:
+                print(f"使用代理: {proxy}", flush=True)
+
+            with SB(**sb_config) as sb:
+                print("SB 上下文已进入", flush=True)
                 log("浏览器启动成功 (UC Mode)")
                 
                 # 1. 登录流程 (如果有 login_url 或检测到登录页)
