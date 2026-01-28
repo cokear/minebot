@@ -92,9 +92,7 @@ interface RenewalFormData {
   afkMode: boolean;
   clickWaitTime: number;
 
-  // 验证码插件配置
-  captchaEnabled: boolean;
-  captchaKey: string;
+
 
   // 手动 Cookie
   manualCookies: string;
@@ -119,8 +117,7 @@ const defaultFormData: RenewalFormData = {
   closeBrowser: true,
   afkMode: false,
   clickWaitTime: 5000,
-  captchaEnabled: false,
-  captchaKey: "",
+
   manualCookies: "",
 };
 
@@ -240,10 +237,7 @@ export function RenewalPanel() {
         closeBrowser: formData.closeBrowser,
         afkMode: formData.afkMode,
         clickWaitTime: formData.clickWaitTime,
-        captcha: {
-          enabled: formData.captchaEnabled,
-          key: formData.captchaKey
-        },
+
         manualCookies: formData.manualCookies
       };
 
@@ -303,8 +297,7 @@ export function RenewalPanel() {
       closeBrowser: (renewal as any).closeBrowser !== false,
       afkMode: (renewal as any).afkMode || false,
       clickWaitTime: (renewal as any).clickWaitTime || 5000,
-      captchaEnabled: (renewal as any).captcha?.enabled || false,
-      captchaKey: (renewal as any).captcha?.key || "",
+
       manualCookies: (renewal as any).manualCookies || "",
     });
     setEditingId(renewal.id);
@@ -645,68 +638,7 @@ export function RenewalPanel() {
                           </div>
                         </div>
 
-                        {/* 验证码插件配置 */}
-                        <div className="pt-3 border-t space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label className="flex items-center gap-2 cursor-pointer" htmlFor="captcha-enabled">
-                              <Key className="h-4 w-4" />
-                              <div className="flex flex-col gap-0.5">
-                                <span>验证码破解插件 (NopeCHA)</span>
-                                <span className="text-xs font-normal text-muted-foreground">自动解决 Cloudflare Turnstile 等验证码</span>
-                              </div>
-                            </Label>
-                            <Switch
-                              id="captcha-enabled"
-                              checked={formData.captchaEnabled}
-                              onCheckedChange={(checked) => setFormData({ ...formData, captchaEnabled: checked })}
-                            />
-                          </div>
 
-                          {formData.captchaEnabled && (
-                            <div className="space-y-2 p-3 bg-muted/40 rounded-lg animate-in fade-in zoom-in-95 duration-200">
-                              <Label className="text-xs">API Key</Label>
-                              <div className="flex gap-2">
-                                <Input
-                                  type="password"
-                                  value={formData.captchaKey}
-                                  onChange={(e) => setFormData({ ...formData, captchaKey: e.target.value })}
-                                  placeholder="sub_xxxxxxxxxxxx"
-                                  className="flex-1 font-mono text-xs"
-                                />
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={!formData.captchaKey || loading}
-                                  onClick={async () => {
-                                    if (!formData.captchaKey) return;
-                                    setLoading(true);
-                                    try {
-                                      const balance = await api.checkCaptchaBalance(formData.captchaKey);
-                                      if (balance.error) {
-                                        toast({ title: "查询失败", description: balance.error, variant: "destructive" });
-                                      } else {
-                                        toast({
-                                          title: "查询成功",
-                                          description: `剩余积分: ${balance.credit} (${balance.status})`,
-                                        });
-                                      }
-                                    } catch (error) {
-                                      toast({ title: "查询失败", description: String(error), variant: "destructive" });
-                                    } finally {
-                                      setLoading(false);
-                                    }
-                                  }}
-                                >
-                                  {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <span className="whitespace-nowrap">查询余额</span>}
-                                </Button>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                需要有效的订阅 Key，<a href="https://nopecha.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">获取 Key</a>
-                              </p>
-                            </div>
-                          )}
-                        </div>
                       </div>
                     )}
 

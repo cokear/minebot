@@ -106,11 +106,7 @@ export interface RenewalConfig {
   useBrowserClick?: boolean;
   renewPageUrl?: string;
 
-  // 验证码插件设置
-  captcha?: {
-    enabled: boolean;
-    key?: string;
-  };
+
 
   // 手动 Cookie 配置
   manualCookies?: string;
@@ -507,12 +503,7 @@ class ApiService {
     });
   }
 
-  async checkCaptchaBalance(key: string): Promise<any> {
-    return this.request('/api/captcha/balance', {
-      method: 'POST',
-      body: JSON.stringify({ key }),
-    });
-  }
+
 
   async startRenewal(id: string): Promise<{ success: boolean }> {
     return this.request(`/api/renewals/${id}/start`, { method: 'POST' });
