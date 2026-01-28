@@ -1391,7 +1391,34 @@ export class RenewalService {
       if (alreadyLoggedIn) {
         this.log('info', `检测到已登录状态，跳过登录步骤 (当前页面: ${currentUrl})`, id);
       } else if (isCloudflarePage) {
-        this.log('warning', '检测到仍在 Cloudflare 验证页面，等待插件处理...', id);
+        this.log('warning', '检测到仍在 Cloudflare 验证页面，等待处理...', id);
+
+        // 尝试使用 Sidecar 解决
+        if (renewal.useBypassService) {
+          this.log('info', '尝试使用 Bypass Service 进行验证...', id);
+          try {
+            const bypassResult = await this.getCookiesFromBypassService(url, renewal.bypassServiceUrl, renewal.browserProxy, id);
+            if (bypassResult && bypassResult.cookies) {
+              this.log('info', 'Bypass Service 验证成功，注入 Cookie...', id);
+              const cookiesToInject = Object.entries(bypassResult.cookies).map(([name, value]) => ({
+                name,
+                value,
+                domain: new URL(url).hostname,
+                path: '/',
+              }));
+              await page.setCookie(...cookiesToInject);
+              if (bypassResult.user_agent) {
+                await page.setUserAgent(bypassResult.user_agent);
+              }
+              // 重新刷新页面
+              this.log('info', 'Cookie 注入完成，刷新页面...', id);
+              await page.reload({ waitUntil: 'networkidle2' });
+            }
+          } catch (err) {
+            this.log('error', `Bypass Service 调用失败: ${err.message}`, id);
+          }
+        }
+
         // 如果是 CF 页面，不要刷新，直接进入下面的流程让 handleTurnstile/插件 去处理
       } else if (reusedPage) {
         // 如果是复用的页面但未登录，可能登录失效，刷新页面重试
