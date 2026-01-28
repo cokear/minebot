@@ -94,6 +94,9 @@ interface RenewalFormData {
 
 
 
+  // Bypass Service 配置
+  useBypassService: boolean;
+
   // 手动 Cookie
   manualCookies: string;
 }
@@ -117,6 +120,7 @@ const defaultFormData: RenewalFormData = {
   closeBrowser: true,
   afkMode: false,
   clickWaitTime: 5000,
+  useBypassService: false,
 
   manualCookies: "",
 };
@@ -237,6 +241,7 @@ export function RenewalPanel() {
         closeBrowser: formData.closeBrowser,
         afkMode: formData.afkMode,
         clickWaitTime: formData.clickWaitTime,
+        useBypassService: formData.useBypassService,
 
         manualCookies: formData.manualCookies
       };
@@ -297,6 +302,7 @@ export function RenewalPanel() {
       closeBrowser: (renewal as any).closeBrowser !== false,
       afkMode: (renewal as any).afkMode || false,
       clickWaitTime: (renewal as any).clickWaitTime || 5000,
+      useBypassService: (renewal as any).useBypassService || false,
 
       manualCookies: (renewal as any).manualCookies || "",
     });
@@ -545,6 +551,18 @@ export function RenewalPanel() {
                               onChange={(e) => setFormData({ ...formData, panelPassword: e.target.value })}
                             />
                           </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-2">
+                          <Label htmlFor="use-bypass" className="flex flex-col gap-0.5 cursor-pointer">
+                            <span className="text-xs font-medium">使用验证码破解服务 (Bypass Service)</span>
+                            <span className="text-[10px] text-muted-foreground">自动解决登录页面的 Cloudflare 验证码</span>
+                          </Label>
+                          <Switch
+                            id="use-bypass"
+                            checked={formData.useBypassService}
+                            onCheckedChange={(checked) => setFormData({ ...formData, useBypassService: checked })}
+                          />
                         </div>
                       </div>
                     )}

@@ -108,6 +108,9 @@ export interface RenewalConfig {
 
 
 
+  // Bypass Service 配置
+  useBypassService?: boolean;
+
   // 手动 Cookie 配置
   manualCookies?: string;
 }

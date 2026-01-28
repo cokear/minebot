@@ -212,7 +212,7 @@ export class RenewalService {
       panelUsername: renewalConfig.panelUsername || '',
       panelPassword: renewalConfig.panelPassword || '',
       bypassServiceUrl: renewalConfig.bypassServiceUrl || process.env.BYPASS_SERVICE_URL || 'http://bypass-service:5000',
-      useBypassService: renewalConfig.useBypassService !== false,
+      useBypassService: renewalConfig.useBypassService === true,
 
       // 浏览器点击配置（browserClick 模式）
       renewButtonSelector: renewalConfig.renewButtonSelector || '',
@@ -608,7 +608,7 @@ export class RenewalService {
 
     let sidecarData = null;
     // 尝试使用 Sidecar 预处理 (获取 Cloudflare Cookies)
-    if (process.env.BYPASS_SERVICE_URL) {
+    if (process.env.BYPASS_SERVICE_URL && renewal.useBypassService) {
       sidecarData = await this.solveCaptchaWithSidecar(loginUrl, null); // 暂时不透传代理，或者需要从 config 获取
     }
 
