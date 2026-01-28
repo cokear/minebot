@@ -12,7 +12,7 @@ display = None
 
 
 
-from bypass_seleniumbase import bypass_and_get_cookies
+from simple_bypass import bypass_cloudflare as bypass_seleniumbase_impl
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -34,12 +34,13 @@ def bypass():
     try:
         # Select engine based on mode
         if mode == 'seleniumbase':
-            # Use the class-based implementation
-            result = bypass_and_get_cookies(
+            # Use simple_bypass implementation which is self-contained
+            result = bypass_seleniumbase_impl(
                 url=url,
                 proxy=proxy,
-                session_name=f"api_{int(timeout)}",
-                headless=True # Force headless for API
+                timeout=timeout,
+                save_cookies=False,
+                wait_time=8.0 # Give it a bit more time
             )
         else:
             # Use the default implementation (function-based)
