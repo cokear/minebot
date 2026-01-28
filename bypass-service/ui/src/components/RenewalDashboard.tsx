@@ -4,7 +4,6 @@ import {
     Plus,
     Trash2,
     Play,
-    Square,
     CheckCircle,
     XCircle,
     Loader2,
@@ -12,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -24,7 +23,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { api, RenewalTask } from "@/lib/api";
+import { api, type RenewalTask } from "@/lib/api";
 
 export function RenewalDashboard() {
     const [tasks, setTasks] = useState<RenewalTask[]>([]);
@@ -99,7 +98,7 @@ export function RenewalDashboard() {
             username: task.username,
             password: task.password,
             proxy: task.proxy || "",
-            selectors: task.selectors || { renew_btn: "" },
+            selectors: { renew_btn: task.selectors?.renew_btn || "" },
             interval: task.interval,
             enabled: task.enabled,
         });
