@@ -20,21 +20,32 @@ RUN npm run build
 # ==================== Stage 2: Python Backend with Frontend ====================
 FROM python:3.10-slim
 
+# Build arguments
+ARG TARGETARCH
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
     unzip \
     xvfb \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Chrome (for SeleniumBase) - using new GPG key method
-RUN wget -q -O /tmp/google-chrome.gpg https://dl-ssl.google.com/linux/linux_signing_key.pub \
-    && gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg /tmp/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/* /tmp/google-chrome.gpg
+# Install Browser (Chrome for AMD64, Chromium for ARM64)
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+    echo "Installing Google Chrome for AMD64..." && \
+    wget -q -O /tmp/google-chrome.gpg https://dl-ssl.google.com/linux/linux_signing_key.pub && \
+    gpg --dearmor -o /usr/share/keyrings/google-chrome-keyring.gpg /tmp/google-chrome.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome-keyring.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable; \
+    else \
+    echo "Installing Chromium for ARM64..." && \
+    apt-get update && \
+    apt-get install -y chromium chromium-driver; \
+    fi && \
+    rm -rf /var/lib/apt/lists/* /tmp/google-chrome.gpg
 
 # Set working directory
 WORKDIR /app
