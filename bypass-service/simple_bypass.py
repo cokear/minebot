@@ -613,6 +613,8 @@ def bypass_cloudflare(
             
         except TimeoutError:
             print(f"[-] 超时 ({timeout}秒)")
+            try:
+                signal.alarm(0)
             except:
                 pass
             return False
