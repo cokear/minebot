@@ -371,7 +371,7 @@ export function RenewalDashboard() {
                                 </div>
 
                                 <div className="flex items-center gap-2 text-sm">
-                                    <Badge variant={task.lastResult?.success ? "success" : (task.lastResult ? "destructive" : "outline")}
+                                    <Badge variant={task.lastResult?.success ? "outline" : (task.lastResult ? "destructive" : "outline")}
                                         className={task.lastResult?.success ? "bg-green-500/10 text-green-500 border-green-500/20" : ""}
                                     >
                                         {task.lastResult?.success ? "运行成功" : (task.lastResult ? "运行失败" : "从未运行")}
