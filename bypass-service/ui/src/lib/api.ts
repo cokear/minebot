@@ -6,6 +6,8 @@ export interface RenewalTask {
     url: string;
     username: string;
     password: string;
+    login_url?: string;
+    action_type?: 'renewal' | 'keepalive';
     proxy?: string;
     selectors?: {
         renew_btn?: string;

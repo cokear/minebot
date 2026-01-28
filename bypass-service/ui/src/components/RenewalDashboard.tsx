@@ -51,6 +51,8 @@ export function RenewalDashboard() {
         url: "",
         username: "",
         password: "",
+        login_url: "",
+        action_type: "renewal",
         proxy: "",
         selectors: { renew_btn: "", confirm_btn: "" },
         timeout: 120,
@@ -110,6 +112,8 @@ export function RenewalDashboard() {
             url: "",
             username: "",
             password: "",
+            login_url: "",
+            action_type: "renewal",
             proxy: "",
             selectors: { renew_btn: "", confirm_btn: "" },
             timeout: 120,
@@ -128,6 +132,8 @@ export function RenewalDashboard() {
             url: task.url,
             username: task.username,
             password: task.password,
+            login_url: task.login_url || "",
+            action_type: (task.action_type as any) || "renewal",
             proxy: task.proxy || "",
             selectors: {
                 renew_btn: task.selectors?.renew_btn || "",
@@ -230,12 +236,37 @@ export function RenewalDashboard() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>目标 URL *</Label>
+                                    <Label>目标页面 URL (续期/挂机页面) *</Label>
                                     <Input
-                                        placeholder="https://..."
+                                        placeholder="https://panel.example.com/server?id=123"
                                         value={formData.url}
                                         onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>登录页面 URL (可选，若与目标页不同)</Label>
+                                    <Input
+                                        placeholder="https://panel.example.com/login"
+                                        value={formData.login_url || ""}
+                                        onChange={(e) => setFormData({ ...formData, login_url: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>任务模式</Label>
+                                    <div className="flex gap-4">
+                                        <div className={`cursor-pointer border rounded-md p-3 flex-1 flex items-center justify-center gap-2 ${formData.action_type === 'renewal' || !formData.action_type ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted'}`}
+                                            onClick={() => setFormData({ ...formData, action_type: 'renewal' })}
+                                        >
+                                            <RefreshCw className="h-4 w-4" />
+                                            <span>自动续期</span>
+                                        </div>
+                                        <div className={`cursor-pointer border rounded-md p-3 flex-1 flex items-center justify-center gap-2 ${formData.action_type === 'keepalive' ? 'bg-primary/10 border-primary text-primary' : 'hover:bg-muted'}`}
+                                            onClick={() => setFormData({ ...formData, action_type: 'keepalive' })}
+                                        >
+                                            <Clock className="h-4 w-4" />
+                                            <span>访问保活</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
