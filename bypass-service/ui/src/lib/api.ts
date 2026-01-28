@@ -85,6 +85,13 @@ class ApiService {
             body: JSON.stringify({ enabled }),
         });
     }
+
+    async checkProxy(proxy: string): Promise<{ success: boolean; message?: string; error?: string }> {
+        return this.request('/api/proxy/check', {
+            method: 'POST',
+            body: JSON.stringify({ proxy }),
+        });
+    }
 }
 
 export const api = new ApiService();

@@ -88,7 +88,8 @@ export function RenewalDashboard() {
         try {
             const payload = {
                 ...formData,
-                success_keywords: formData.success_keywords.split(',').map(k => k.trim()).filter(Boolean)
+                success_keywords: formData.success_keywords.split(',').map(k => k.trim()).filter(Boolean),
+                action_type: formData.action_type as "renewal" | "keepalive"
             };
 
             if (editingId) {
