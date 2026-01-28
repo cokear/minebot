@@ -55,6 +55,29 @@ def bypass():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+
+@app.route('/renew', methods=['POST'])
+def renew():
+    data = request.json
+    url = data.get('url')
+    username = data.get('username')
+    password = data.get('password')
+    proxy = data.get('proxy')
+    selectors = data.get('selectors', {})
+    
+    if not url or not username or not password:
+        return jsonify({"success": False, "error": "Missing url, username or password"}), 400
+        
+    print(f"[*] 收到续期请求: {url} ({username})")
+    
+    # 导入 RenewalHandler (延迟导入避免循环依赖)
+    from renewal import RenewalHandler
+    
+    handler = RenewalHandler()
+    result = handler.run_renewal(url, username, password, proxy, selectors)
+    
+    return jsonify(result)
+
 if __name__ == '__main__':
     # Initialize display on startup
     display = setup_display()
