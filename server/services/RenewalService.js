@@ -555,6 +555,46 @@ export class RenewalService {
   }
 
   /**
+   * 使用 Sidecar 服务处理验证码
+   */
+  async solveCaptchaWithSidecar(url, proxyUrl) {
+    const bypassServiceUrl = process.env.BYPASS_SERVICE_URL;
+    if (!bypassServiceUrl) return null;
+
+    this.log('info', `尝试使用 Bypass Service (${bypassServiceUrl})...`);
+
+    try {
+      const response = await fetch(`${bypassServiceUrl}/bypass`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url,
+          proxy: proxyUrl, // Sidecar 需要完整的代理字符串
+          timeout: 120 // 2分钟超时
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Bypass service error: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || 'Unknown bypass error');
+      }
+
+      this.log('info', 'Bypass Service 成功获取 Cookies');
+      return {
+        cookies: result.cookies,
+        userAgent: result.user_agent
+      };
+    } catch (error) {
+      this.log('warning', `Bypass Service 调用失败: ${error.message}，将回退到本地处理`);
+      return null;
+    }
+  }
+
+  /**
    * 使用无头浏览器自动登录获取 Cookie
    */
   async autoLoginAndGetCookies(renewal) {
