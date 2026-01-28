@@ -212,7 +212,9 @@ export class RenewalService {
       panelUsername: renewalConfig.panelUsername || '',
       panelPassword: renewalConfig.panelPassword || '',
       bypassServiceUrl: renewalConfig.bypassServiceUrl || process.env.BYPASS_SERVICE_URL || 'http://bypass-service:5000',
+      bypassServiceUrl: renewalConfig.bypassServiceUrl || process.env.BYPASS_SERVICE_URL || 'http://bypass-service:5000',
       useBypassService: renewalConfig.useBypassService === true,
+      bypassMode: renewalConfig.bypassMode || 'seleniumbase', // Default to seleniumbase
 
       // 浏览器点击配置（browserClick 模式）
       renewButtonSelector: renewalConfig.renewButtonSelector || '',
@@ -557,11 +559,11 @@ export class RenewalService {
   /**
    * 使用 Sidecar 服务处理验证码
    */
-  async solveCaptchaWithSidecar(url, proxyUrl) {
+  async solveCaptchaWithSidecar(url, proxyUrl, mode = 'default') {
     const bypassServiceUrl = process.env.BYPASS_SERVICE_URL;
     if (!bypassServiceUrl) return null;
 
-    this.log('info', `尝试使用 Bypass Service (${bypassServiceUrl})...`);
+    this.log('info', `尝试使用 Bypass Service (${bypassServiceUrl}) [模式: ${mode}]...`);
 
     try {
       const response = await fetch(`${bypassServiceUrl}/bypass`, {
@@ -570,6 +572,7 @@ export class RenewalService {
         body: JSON.stringify({
           url,
           proxy: proxyUrl, // Sidecar 需要完整的代理字符串
+          mode,
           timeout: 120 // 2分钟超时
         })
       });
@@ -609,7 +612,7 @@ export class RenewalService {
     let sidecarData = null;
     // 尝试使用 Sidecar 预处理 (获取 Cloudflare Cookies)
     if (process.env.BYPASS_SERVICE_URL && renewal.useBypassService) {
-      sidecarData = await this.solveCaptchaWithSidecar(loginUrl, null); // 暂时不透传代理，或者需要从 config 获取
+      sidecarData = await this.solveCaptchaWithSidecar(loginUrl, null, renewal.bypassMode); // 暂时不透传代理，或者需要从 config 获取
     }
 
     const browser = await this.getBrowser();

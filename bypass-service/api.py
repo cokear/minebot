@@ -12,6 +12,8 @@ display = None
 
 
 
+from bypass_seleniumbase import bypass_and_get_cookies
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok", "service": "cloudflare-bypass"})
@@ -25,17 +27,29 @@ def bypass():
     url = data.get('url')
     proxy = data.get('proxy') # Optional
     timeout = data.get('timeout', 60.0)
+    mode = data.get('mode', 'default') # default, seleniumbase
     
-    print(f"[API] Request bypass for: {url} (Proxy: {proxy})")
+    print(f"[API] Request bypass ({mode}) for: {url} (Proxy: {proxy})")
     
-    # Call the existing bypass function
     try:
-        result = bypass_cloudflare(
-            url=url,
-            proxy=proxy,
-            timeout=timeout,
-            save_cookies=False # Don't save to file, just return
-        )
+        # Select engine based on mode
+        if mode == 'seleniumbase':
+            # Use the class-based implementation
+            result = bypass_and_get_cookies(
+                url=url,
+                proxy=proxy,
+                session_name=f"api_{int(timeout)}",
+                headless=True # Force headless for API
+            )
+        else:
+            # Use the default implementation (function-based)
+            result = bypass_cloudflare(
+                url=url,
+                proxy=proxy,
+                timeout=timeout,
+                save_cookies=False
+            )
+            
         return jsonify(result)
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

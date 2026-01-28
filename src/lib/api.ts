@@ -110,6 +110,7 @@ export interface RenewalConfig {
 
   // Bypass Service 配置
   useBypassService?: boolean;
+  bypassMode?: string; // default, seleniumbase
 
   // 手动 Cookie 配置
   manualCookies?: string;

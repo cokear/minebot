@@ -96,6 +96,7 @@ interface RenewalFormData {
 
   // Bypass Service 配置
   useBypassService: boolean;
+  bypassMode: string;
 
   // 手动 Cookie
   manualCookies: string;
@@ -121,6 +122,7 @@ const defaultFormData: RenewalFormData = {
   afkMode: false,
   clickWaitTime: 5000,
   useBypassService: false,
+  bypassMode: "seleniumbase", // Default to seleniumbase as it's more robust
 
   manualCookies: "",
 };
@@ -241,7 +243,10 @@ export function RenewalPanel() {
         closeBrowser: formData.closeBrowser,
         afkMode: formData.afkMode,
         clickWaitTime: formData.clickWaitTime,
+        afkMode: formData.afkMode,
+        clickWaitTime: formData.clickWaitTime,
         useBypassService: formData.useBypassService,
+        bypassMode: formData.bypassMode,
 
         manualCookies: formData.manualCookies
       };
@@ -303,6 +308,7 @@ export function RenewalPanel() {
       afkMode: (renewal as any).afkMode || false,
       clickWaitTime: (renewal as any).clickWaitTime || 5000,
       useBypassService: (renewal as any).useBypassService || false,
+      bypassMode: (renewal as any).bypassMode || "seleniumbase",
 
       manualCookies: (renewal as any).manualCookies || "",
     });
@@ -564,6 +570,27 @@ export function RenewalPanel() {
                             onCheckedChange={(checked) => setFormData({ ...formData, useBypassService: checked })}
                           />
                         </div>
+
+                        {formData.useBypassService && (
+                          <div className="space-y-2 pt-1 animate-in fade-in slide-in-from-top-1">
+                            <Label className="text-xs">Bypass 模式</Label>
+                            <Select
+                              value={formData.bypassMode}
+                              onValueChange={(v) => setFormData({ ...formData, bypassMode: v })}
+                            >
+                              <SelectTrigger className="h-8">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="z-[10000]">
+                                <SelectItem value="default">Default (轻量级)</SelectItem>
+                                <SelectItem value="seleniumbase">SeleniumBase (强力模式 - 推荐)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-muted-foreground">
+                              如果遇到验证失败，请尝试切换到 SeleniumBase 模式
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
 
