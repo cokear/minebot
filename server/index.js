@@ -1424,7 +1424,7 @@ app.post('/api/webhooks/trigger', async (req, res) => {
 
               if (finalToken && finalChatId) {
                 try {
-                  const message = `⚡ 检测到服务器 [${bot.config.name}] 离线，Webhook 触发自动开机成功！`;
+                  const message = `⚡电源信号已发送: [${bot.config.name}] 开机成功`;
                   await axios.post(`https://api.telegram.org/bot${finalToken}/sendMessage`, {
                     chat_id: finalChatId,
                     text: message

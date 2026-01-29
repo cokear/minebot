@@ -71,7 +71,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="sm:max-w-[600px] top-[15%] translate-y-0">
                 <DialogHeader>
                     <DialogTitle>全局设置</DialogTitle>
                     <DialogDescription>
