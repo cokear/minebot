@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { GlobalSettingsDialog } from "./GlobalSettingsDialog";
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -11,6 +12,7 @@ export function Header() {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -77,7 +79,7 @@ export function Header() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate("/settings")}
+              onClick={() => setSettingsOpen(true)}
               className="rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
             >
               <Settings className="h-5 w-5" />
@@ -153,6 +155,10 @@ export function Header() {
           </div>
         </nav>
       </div>
+      {/* Mobile Menu */}
+      {/* ... existing mobile menu code ... */}
+
+      <GlobalSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </header>
   );
 }

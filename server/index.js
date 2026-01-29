@@ -1348,6 +1348,34 @@ app.post('/api/bots/:id/files/decompress', async (req, res) => {
 });
 
 // Serve frontend for all other routes
+
+
+// Telegram Config Endpoints
+app.get('/api/config/telegram', (req, res) => {
+  const config = configManager.getConfig().telegram || {};
+  res.json(config);
+});
+
+app.post('/api/config/telegram', (req, res) => {
+  try {
+    const { enabled, botToken, chatId } = req.body;
+    const currentConfig = configManager.getFullConfig();
+    const currentTelegram = currentConfig.telegram || {};
+
+    const newTelegram = {
+      enabled: enabled !== undefined ? enabled : currentTelegram.enabled,
+      chatId: chatId !== undefined ? chatId : currentTelegram.chatId,
+      botToken: (botToken && botToken !== '***') ? botToken : currentTelegram.botToken
+    };
+
+    configManager.updateConfig({ telegram: newTelegram });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Serve frontend for all other routes
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));
 });
@@ -1388,14 +1416,17 @@ app.post('/api/webhooks/trigger', async (req, res) => {
           bot.sendPowerSignal('start')
             .then(async () => {
               // 成功开机后，发送 Telegram 通知
-              const tgToken = process.env.TG_BOT_TOKEN;
-              const tgChatId = process.env.TG_CHAT_ID;
+              const tgConfig = configManager.getFullConfig().telegram || {};
+              const { enabled, botToken, chatId } = tgConfig;
 
-              if (tgToken && tgChatId) {
+              const finalToken = enabled && botToken ? botToken : process.env.TG_BOT_TOKEN;
+              const finalChatId = enabled && chatId ? chatId : process.env.TG_CHAT_ID;
+
+              if (finalToken && finalChatId) {
                 try {
                   const message = `⚡ 检测到服务器 [${bot.config.name}] 离线，Webhook 触发自动开机成功！`;
-                  await axios.post(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
-                    chat_id: tgChatId,
+                  await axios.post(`https://api.telegram.org/bot${finalToken}/sendMessage`, {
+                    chat_id: finalChatId,
                     text: message
                   });
                   console.log(`[Telegram]这里是TG消息通知推送日志 Notification sent for ${serverName}`);

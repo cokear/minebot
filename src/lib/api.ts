@@ -66,6 +66,17 @@ export interface Config {
     body: string;
     interval: number;
   };
+  telegram: {
+    enabled: boolean;
+    botToken: string;
+    chatId: string;
+  };
+}
+
+export interface TelegramConfig {
+  enabled: boolean;
+  botToken: string;
+  chatId: string;
 }
 
 export interface RenewalConfig {
@@ -605,6 +616,19 @@ class ApiService {
     return this.request(`/api/bots/${id}/files/decompress`, {
       method: 'POST',
       body: JSON.stringify({ root, file }),
+    });
+  }
+
+  // ==================== 全局配置 API ====================
+
+  async getTelegramConfig(): Promise<TelegramConfig> {
+    return this.request('/api/config/telegram');
+  }
+
+  async updateTelegramConfig(config: Partial<TelegramConfig>): Promise<{ success: boolean; error?: string }> {
+    return this.request('/api/config/telegram', {
+      method: 'POST',
+      body: JSON.stringify(config),
     });
   }
 }

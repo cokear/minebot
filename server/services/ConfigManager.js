@@ -176,6 +176,11 @@ export class ConfigManager {
         apiKey: '',
         systemPrompt: ''
       },
+      telegram: {
+        enabled: false,
+        botToken: '',
+        chatId: ''
+      },
       auth: {
         username: 'admin',
         password: 'admin123'
@@ -211,6 +216,10 @@ export class ConfigManager {
       ai: {
         ...this.config.ai,
         apiKey: this.config.ai?.apiKey ? '***' : ''
+      },
+      telegram: {
+        ...this.config.telegram,
+        botToken: this.config.telegram?.botToken ? '***' : ''
       }
     };
   }
