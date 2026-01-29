@@ -216,7 +216,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // Apply auth middleware to all /api routes except auth and screenshots
 app.use('/api', (req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path.startsWith('/screenshots/')) {
+  if (req.path.startsWith('/auth/') || req.path.startsWith('/screenshots/') || req.path.startsWith('/webhooks/')) {
     return next();
   }
   return authService.authMiddleware()(req, res, next);
@@ -1405,6 +1405,13 @@ app.post('/api/webhooks/trigger', async (req, res) => {
     }
   } catch (error) {
     console.error('[Webhook] Error:', error);
+    // 广播错误以便用户知道请求失败了
+    broadcast('log', {
+      type: 'error',
+      icon: '💥',
+      message: `Webhook 处理出错: ${error.message}`,
+      timestamp: new Date().toLocaleTimeString()
+    });
     res.status(500).json({ error: error.message });
   }
 });
