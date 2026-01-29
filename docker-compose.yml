@@ -52,6 +52,17 @@ services:
       - PYTHONUNBUFFERED=1
       - DISPLAY=:99
       - SE_OFFLINE=1
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
 volumes:
   minebot-data:
     driver: local

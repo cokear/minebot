@@ -1351,6 +1351,51 @@ app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));
 });
 
+// Webhook endpoint for auto power-on
+app.post('/api/webhooks/trigger', async (req, res) => {
+  try {
+    const body = req.body;
+    // 将整个 body 转为小写字符串以便匹配
+    const content = JSON.stringify(body).toLowerCase();
+
+    console.log('[Webhook] Received trigger:', content.substring(0, 200) + '...');
+
+    const matchedBots = [];
+
+    // 遍历所有机器人实例
+    for (const [id, bot] of botManager.bots) {
+      // 获取服务器名称（优先用配置名，没有则用默认名）
+      const serverName = (bot.config.name || bot.status.serverName || '').toLowerCase();
+
+      // 如果服务器名字有效且出现在 webhook 内容中
+      if (serverName && content.includes(serverName)) {
+        // 检查是否有面板配置
+        if (bot.status.pterodactyl?.url && bot.status.pterodactyl?.apiKey) {
+          console.log(`[Webhook] Matched server: ${serverName}, sending start signal...`);
+
+          // 为了不阻塞响应，异步执行开机
+          bot.sendPowerSignal('start').catch(e => {
+            console.error(`[Webhook] Failed to start ${serverName}:`, e.message);
+          });
+
+          matchedBots.push(serverName);
+        } else {
+          console.log(`[Webhook] Matched ${serverName} but no Pterodactyl config found.`);
+        }
+      }
+    }
+
+    if (matchedBots.length > 0) {
+      res.json({ success: true, message: `Triggered start for: ${matchedBots.join(', ')}`, matched: matchedBots });
+    } else {
+      res.json({ success: false, message: 'No matching server found with panel config' });
+    }
+  } catch (error) {
+    console.error('[Webhook] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 检查 Captcha 余额
 app.post('/api/captcha/balance', async (req, res) => {
   try {
