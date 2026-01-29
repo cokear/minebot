@@ -1,4 +1,5 @@
 import express from 'express';
+import axios from 'axios';
 import cors from 'cors';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
@@ -1384,10 +1385,29 @@ app.post('/api/webhooks/trigger', async (req, res) => {
           broadcast('log', { type: 'success', icon: '⚡', message: msg, timestamp: new Date().toLocaleTimeString() });
 
           // 为了不阻塞响应，异步执行开机
-          bot.sendPowerSignal('start').catch(e => {
-            console.error(`[Webhook] Failed to start ${serverName}:`, e.message);
-            broadcast('log', { type: 'error', icon: '❌', message: `开机失败: ${e.message}`, timestamp: new Date().toLocaleTimeString() });
-          });
+          bot.sendPowerSignal('start')
+            .then(async () => {
+              // 成功开机后，发送 Telegram 通知
+              const tgToken = process.env.TG_BOT_TOKEN;
+              const tgChatId = process.env.TG_CHAT_ID;
+
+              if (tgToken && tgChatId) {
+                try {
+                  const message = `⚡ 检测到服务器 [${bot.config.name}] 离线，Webhook 触发自动开机成功！`;
+                  await axios.post(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+                    chat_id: tgChatId,
+                    text: message
+                  });
+                  console.log(`[Telegram]这里是TG消息通知推送日志 Notification sent for ${serverName}`);
+                } catch (tgError) {
+                  console.error('[Telegram] Failed to send notification:', tgError.message);
+                }
+              }
+            })
+            .catch(e => {
+              console.error(`[Webhook] Failed to start ${serverName}:`, e.message);
+              broadcast('log', { type: 'error', icon: '❌', message: `开机失败: ${e.message}`, timestamp: new Date().toLocaleTimeString() });
+            });
 
           matchedBots.push(serverName);
         } else {
