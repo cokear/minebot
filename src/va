@@ -4,7 +4,7 @@
 // @version      3.1
 // @description  全功能版：24h时间监控 + 拟人化点击 + 状态机持久化 + 后台防休眠 (适配 Vernieuw Nu)
 // @author       Gemini
-// @match        https://dash.valtoriacloud.xyz/server/manage?id=*
+// @match        https://hyper-hub.nl/server/manage?id=*
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
