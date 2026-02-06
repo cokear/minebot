@@ -1,0 +1,73 @@
+// ==UserScript==
+// @name         Angara Host - 自动挂机防掉线助手
+// @namespace    http://tampermonkey.net/
+// @version      1.1
+// @description  自动检测 AFK 状态，模拟心跳防止掉线，并在掉线时自动重登
+// @author       Antigravity
+// @match        *://freedash.worldofangara.fun/*
+// @grant        none
+// ==/UserScript==
+(function () {
+    'use strict';
+    // ================= 配置区域 =================
+    const CONFIG = {
+        AFK_URL: '/earn/afk',      // 挂机页面的精准路径
+        CHECK_INTERVAL: 10000,     // 状态检查频率 (10秒)
+        HEARTBEAT_INTERVAL: 60000, // 心跳频率 (1分钟)
+    };
+    console.log("%c[Angara AFK Helper] 脚本已启动", "color: #ff4500; font-weight: bold;");
+    // 1. 模拟人类心跳 (维持会话)
+    setInterval(() => {
+        // 模拟微小的页面滚动
+        window.scrollBy(0, 2);
+        setTimeout(() => window.scrollBy(0, -2), 500);
+        // 随机移动一下鼠标位置（如果支持）
+        const event = new MouseEvent('mousemove', {
+            view: window,
+            bubbles: true,
+            cancelable: true,
+            clientX: Math.random() * window.innerWidth,
+            clientY: Math.random() * window.innerHeight
+        });
+        document.dispatchEvent(event);
+        console.log(`[${new Date().toLocaleTimeString()}] 心跳已发送，会话已刷新...`);
+    }, CONFIG.HEARTBEAT_INTERVAL);
+    // 2. 状态监控与主逻辑
+    setInterval(() => {
+        const currentUrl = window.location.href;
+        // A. 如果在登录页，不做动作（等待用户输入密码，避免死循环）
+        if (currentUrl.includes('login')) {
+            console.warn("发现正在登录页，请手动补录账号密码。");
+            return;
+        }
+        // B. 如果在主页但没去挂机页，自动跳转过去
+        if (!currentUrl.includes(CONFIG.AFK_URL)) {
+            console.log("检测到不在挂机页面，尝试跳转...");
+            const afkLink = Array.from(document.querySelectorAll('a')).find(a => a.innerText.includes('AFK Rewards'));
+            if (afkLink) {
+                afkLink.click();
+            } else {
+                // 如果找不到侧边栏链接，直接修改地址
+                window.location.pathname = CONFIG.AFK_URL;
+            }
+            return;
+        }
+        // C. 检查挂机状态
+        const statusText = document.body.innerText.toLowerCase();
+        const startBtn = Array.from(document.querySelectorAll('button')).find(b =>
+            b.innerText.toLowerCase().includes('start afk') ||
+            b.innerText.toLowerCase().includes('begin afk')
+        );
+        const isActive = statusText.includes('status: active');
+        if (!isActive) {
+            if (startBtn) {
+                console.log("%c检测到挂机已停止，正在自动重新启动...", "color: #00ff00;");
+                startBtn.click();
+            } else {
+                console.log("挂机未激活且找不到开始按钮，请检查页面渲染。");
+            }
+        } else {
+            console.log("状态正常：AFK Active");
+        }
+    }, CONFIG.CHECK_INTERVAL);
+})();
