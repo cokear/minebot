@@ -16,38 +16,56 @@
         HEARTBEAT_INTERVAL: 60000, // 心跳频率 (1分钟)
     };
     console.log("%c[Angara AFK Helper] 脚本已启动", "color: #ff4500; font-weight: bold;");
+    // --- 可视化面板 UI ---
+    const panel = document.createElement('div');
+    panel.style = `
+        position: fixed; top: 10px; right: 10px; width: 280px; height: 180px;
+        background: rgba(0, 0, 0, 0.85); color: #00ff00; font-family: monospace;
+        font-size: 12px; padding: 10px; border-radius: 8px; z-index: 100000;
+        border: 1px solid #444; overflow: hidden; pointer-events: none;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    `;
+    panel.innerHTML = `
+        <div style="border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; font-weight: bold; color: #ffa500;">
+            🚀 Angara AFK Monitor v1.2
+        </div>
+        <div id="afk-log-container" style="height: 140px; overflow-y: auto;"></div>
+    `;
+    document.body.appendChild(panel);
+    const logContainer = panel.querySelector('#afk-log-container');
+    function customLog(msg, color = "#00ff00") {
+        const time = new Date().toLocaleTimeString();
+        const line = document.createElement('div');
+        line.style.marginBottom = '2px';
+        line.innerHTML = `<span style="color: #888;">[${time}]</span> <span style="color: ${color};">${msg}</span>`;
+        logContainer.prepend(line);
+        // 只保留最近 50 条日志
+        if (logContainer.children.length > 50) logContainer.lastChild.remove();
+    }
+    customLog("脚本初始化成功...");
     // 1. 模拟人类心跳 (维持会话)
     setInterval(() => {
         // 模拟微小的页面滚动
         window.scrollBy(0, 2);
         setTimeout(() => window.scrollBy(0, -2), 500);
-        // 随机移动一下鼠标位置（如果支持）
-        const event = new MouseEvent('mousemove', {
-            view: window,
-            bubbles: true,
-            cancelable: true,
-            clientX: Math.random() * window.innerWidth,
-            clientY: Math.random() * window.innerHeight
-        });
-        document.dispatchEvent(event);
-        console.log(`[${new Date().toLocaleTimeString()}] 心跳已发送，会话已刷新...`);
+        customLog("💓 发送活跃心跳 (Session Keepalive)", "#1e90ff");
     }, CONFIG.HEARTBEAT_INTERVAL);
     // 2. 状态监控与主逻辑
     setInterval(() => {
         const currentUrl = window.location.href;
         // A. 如果在登录页，不做动作（等待用户输入密码，避免死循环）
         if (currentUrl.includes('login')) {
-            console.warn("发现正在登录页，请手动补录账号密码。");
+            customLog("⚠️ 发现登录页，请手动登录", "#ff4500");
             return;
         }
         // B. 如果在主页但没去挂机页，自动跳转过去
         if (!currentUrl.includes(CONFIG.AFK_URL)) {
-            console.log("检测到不在挂机页面，尝试跳转...");
+            customLog("🚀 不在挂机页，尝试跳转...", "#ffa500");
             const afkLink = Array.from(document.querySelectorAll('a')).find(a => a.innerText.includes('AFK Rewards'));
             if (afkLink) {
                 afkLink.click();
-            } else {
-                // 如果找不到侧边栏链接，直接修改地址
+            } else if (!currentUrl.includes('/earn')) {
+                // 如果找不到侧边栏链接，且不在任何 /earn 子页面，直接修改地址
                 window.location.pathname = CONFIG.AFK_URL;
             }
             return;
@@ -61,13 +79,17 @@
         const isActive = statusText.includes('status: active');
         if (!isActive) {
             if (startBtn) {
-                console.log("%c检测到挂机已停止，正在自动重新启动...", "color: #00ff00;");
+                customLog("⚡ 挂机已停止，执行自动重启!", "#00ff00");
                 startBtn.click();
             } else {
-                console.log("挂机未激活且找不到开始按钮，请检查页面渲染。");
+                customLog("💬 等待页面加载按钮...", "#888");
             }
         } else {
-            console.log("状态正常：AFK Active");
+            // 仅每 3 次循环显示一次正常状态，避免刷屏
+            if (Math.random() > 0.7) customLog("✅ 挂机中: Status Active", "#32cd32");
         }
     }, CONFIG.CHECK_INTERVAL);
 })();
+
+Comment
+Ctrl+Alt+M
