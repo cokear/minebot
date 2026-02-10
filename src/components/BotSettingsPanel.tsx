@@ -343,16 +343,63 @@ export function BotSettingsPanel({
                     />
                 </div>
                 <div className="space-y-2">
-                    <Label>API Key</Label>
-                    <Input
-                        type="password"
-                        value={panelApiKey}
-                        onChange={(e) => setPanelApiKey(e.target.value)}
-                        placeholder="ptlc_..."
-                    />
+                    <Label>认证方式</Label>
+                    <div className="flex gap-2">
+                        <Button
+                            variant={panelAuthType === 'api' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setPanelAuthType('api')}
+                        >
+                            API Key
+                        </Button>
+                        <Button
+                            variant={panelAuthType === 'cookie' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setPanelAuthType('cookie')}
+                        >
+                            Cookie (抓包)
+                        </Button>
+                    </div>
                 </div>
+
+                {panelAuthType === 'api' ? (
+                    <div className="space-y-2">
+                        <Label>API Key</Label>
+                        <Input
+                            type="password"
+                            value={panelApiKey}
+                            onChange={(e) => setPanelApiKey(e.target.value)}
+                            placeholder="ptlc_..."
+                        />
+                    </div>
+                ) : (
+                    <>
+                        <div className="space-y-2">
+                            <Label>Cookie (pterodactyl_session)</Label>
+                            <Textarea
+                                value={panelCookie}
+                                onChange={(e) => setPanelCookie(e.target.value)}
+                                placeholder="eyJpdiI..."
+                                rows={3}
+                                className="font-mono text-xs"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                请在浏览器 F12 网络面板中找到请求头的 Cookie
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>X-CSRF-Token</Label>
+                            <Input
+                                value={panelCsrfToken}
+                                onChange={(e) => setPanelCsrfToken(e.target.value)}
+                                placeholder="抓包获取 CSRF Token"
+                            />
+                        </div>
+                    </>
+                )}
+
                 <div className="space-y-2">
-                    <Label>服务器 ID</Label>
+                    <Label>服务器 ID (UUID/Identifier)</Label>
                     <Input
                         value={panelServerId}
                         onChange={(e) => setPanelServerId(e.target.value)}
