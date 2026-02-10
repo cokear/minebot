@@ -31,7 +31,10 @@ interface BotSettingsPanelProps {
     };
     pterodactyl?: {
         url: string;
-        apiKey: string;
+        authType?: 'api' | 'cookie';
+        apiKey?: string;
+        cookie?: string;
+        csrfToken?: string;
         serverId: string;
     } | null;
     sftp?: {
@@ -69,7 +72,10 @@ export function BotSettingsPanel({
         autoChatProp?.messages?.join("\n") || ""
     );
     const [panelUrl, setPanelUrl] = useState(pterodactyl?.url || "");
+    const [panelAuthType, setPanelAuthType] = useState<'api' | 'cookie'>(pterodactyl?.authType || 'api');
     const [panelApiKey, setPanelApiKey] = useState(pterodactyl?.apiKey || "");
+    const [panelCookie, setPanelCookie] = useState(pterodactyl?.cookie || "");
+    const [panelCsrfToken, setPanelCsrfToken] = useState(pterodactyl?.csrfToken || "");
     const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
 
     const [sftpHost, setSftpHost] = useState(sftpProp?.host || "");
@@ -86,7 +92,10 @@ export function BotSettingsPanel({
         setAutoChatInterval(((autoChatProp?.interval || 60000) / 1000).toString());
         setAutoChatMessages(autoChatProp?.messages?.join("\n") || "");
         setPanelUrl(pterodactyl?.url || "");
+        setPanelAuthType(pterodactyl?.authType || 'api');
         setPanelApiKey(pterodactyl?.apiKey || "");
+        setPanelCookie(pterodactyl?.cookie || "");
+        setPanelCsrfToken(pterodactyl?.csrfToken || "");
         setPanelServerId(pterodactyl?.serverId || "");
         setSftpHost(sftpProp?.host || "");
         setSftpPort((sftpProp?.port || 22).toString());
@@ -150,7 +159,10 @@ export function BotSettingsPanel({
         try {
             await api.setPterodactyl(botId, {
                 url: panelUrl,
+                authType: panelAuthType,
                 apiKey: panelApiKey,
+                cookie: panelCookie,
+                csrfToken: panelCsrfToken,
                 serverId: panelServerId
             });
             toast({ title: "翼龙面板配置已保存" });

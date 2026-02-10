@@ -99,7 +99,39 @@ export class PanelInstance {
    */
   isPanelConfigured() {
     const panel = this.status.pterodactyl;
-    return panel && panel.url && panel.apiKey && panel.serverId;
+    if (!panel || !panel.url || !panel.serverId) return false;
+
+    if (panel.authType === 'cookie') {
+      return !!(panel.cookie && panel.csrfToken);
+    }
+    return !!panel.apiKey;
+  }
+
+  /**
+   * 获取认证请求头
+   */
+  getAuthHeaders() {
+    const panel = this.status.pterodactyl;
+    if (!panel) return {};
+
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
+
+    if (panel.authType === 'cookie') {
+      headers['Cookie'] = panel.cookie;
+      headers['X-CSRF-Token'] = panel.csrfToken;
+      headers['X-Xsrf-Token'] = panel.csrfToken; // 尝试兼容两种写法
+      // 浏览器通常还需要 User-Agent 和 Referer
+      headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+      headers['Referer'] = `${panel.url}/server/${panel.serverId}`;
+      headers['Origin'] = panel.url;
+    } else {
+      headers['Authorization'] = `Bearer ${panel.apiKey}`;
+    }
+
+    return headers;
   }
 
   /**
@@ -135,7 +167,9 @@ export class PanelInstance {
         if (status === 403) {
           hint = ' (API Key 无效或权限不足，请检查 API Key)';
         } else if (status === 401) {
-          hint = ' (未授权，请检查 API Key)';
+          hint = ' (未授权，请检查 API Key 或 Cookie)';
+        } else if (status === 419) {
+          hint = ' (CSRF Token 失效，请更新 Cookie/Token)';
         } else if (status === 404) {
           hint = ' (服务器ID不存在，请检查配置)';
         }
@@ -197,6 +231,8 @@ export class PanelInstance {
           hint = ' (API Key 无效或权限不足)';
         } else if (status === 401) {
           hint = ' (未授权)';
+        } else if (status === 419) {
+          hint = ' (CSRF Token 失效)';
         } else if (status === 404) {
           hint = ' (服务器ID不存在)';
         }
@@ -283,7 +319,7 @@ export class PanelInstance {
    */
   async fetchServerAllocation() {
     const panel = this.status.pterodactyl;
-    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+    if (!this.isPanelConfigured()) {
       throw new Error('面板未配置');
     }
 
@@ -361,17 +397,14 @@ export class PanelInstance {
    */
   async fetchServerStatus() {
     const panel = this.status.pterodactyl;
-    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+    if (!this.isPanelConfigured()) {
       throw new Error('面板未配置');
     }
 
     const url = `${panel.url}/api/client/servers/${panel.serverId}/resources`;
 
     const response = await axios.get(url, {
-      headers: {
-        'Authorization': `Bearer ${panel.apiKey}`,
-        'Accept': 'application/json'
-      },
+      headers: this.getAuthHeaders(),
       timeout: 10000
     });
 
@@ -438,18 +471,14 @@ export class PanelInstance {
       this.log('info', `正在发送电源信号: ${signalNames[signal]}`, '⚡');
 
       await axios.post(url, { signal }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 15000
       });
 
       this.log('success', `电源信号已发送: ${signalNames[signal]}`, '⚡');
 
       // 刷新状态
-      setTimeout(() => this.fetchServerStatus().catch(() => {}), 2000);
+      setTimeout(() => this.fetchServerStatus().catch(() => { }), 2000);
 
       return { success: true, message: `已发送: ${signalNames[signal]}` };
     } catch (error) {
@@ -485,11 +514,7 @@ export class PanelInstance {
       this.log('info', `发送控制台命令: ${command}`, '🖥️');
 
       await axios.post(url, { command }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 10000
       });
 
@@ -511,14 +536,17 @@ export class PanelInstance {
     // 如果所有字段都为空，清除配置
     const url = (config.url || '').replace(/\/$/, '');
     const apiKey = config.apiKey || '';
+    const cookie = config.cookie || '';
+    const csrfToken = config.csrfToken || '';
+    const authType = config.authType || 'api';
     const serverId = config.serverId || '';
 
-    if (!url && !apiKey && !serverId) {
+    if (!url && !apiKey && !cookie && !serverId) {
       this.status.pterodactyl = null;
       this.log('info', '翼龙面板配置已清除', '🔑');
     } else {
-      this.status.pterodactyl = { url, apiKey, serverId };
-      this.log('info', '翼龙面板配置已更新', '🔑');
+      this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
+      this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
     }
 
     // 保存配置
@@ -554,10 +582,7 @@ export class PanelInstance {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/list`;
       const response = await axios.get(url, {
         params: { directory },
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 15000
       });
 
@@ -595,10 +620,7 @@ export class PanelInstance {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/contents`;
       const response = await axios.get(url, {
         params: { file },
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 30000
       });
 
@@ -626,9 +648,8 @@ export class PanelInstance {
       await axios.post(url, content, {
         params: { file },
         headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'text/plain',
-          'Accept': 'application/json'
+          ...this.getAuthHeaders(),
+          'Content-Type': 'text/plain'
         },
         timeout: 30000
       });
@@ -656,10 +677,7 @@ export class PanelInstance {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/download`;
       const response = await axios.get(url, {
         params: { file },
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 15000
       });
 
@@ -683,10 +701,7 @@ export class PanelInstance {
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/upload`;
       const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 15000
       });
 
@@ -712,11 +727,7 @@ export class PanelInstance {
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/create-folder`;
       await axios.post(url, { root, name }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 15000
       });
 
@@ -743,11 +754,7 @@ export class PanelInstance {
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/delete`;
       await axios.post(url, { root, files }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 30000
       });
 
@@ -778,11 +785,7 @@ export class PanelInstance {
         root,
         files: [{ from, to }]
       }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 15000
       });
 
@@ -808,11 +811,7 @@ export class PanelInstance {
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/copy`;
       await axios.post(url, { location }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 30000
       });
 
@@ -839,11 +838,7 @@ export class PanelInstance {
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/compress`;
       const response = await axios.post(url, { root, files }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 120000 // 压缩可能需要较长时间
       });
 
@@ -871,11 +866,7 @@ export class PanelInstance {
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/decompress`;
       await axios.post(url, { root, file }, {
-        headers: {
-          'Authorization': `Bearer ${panel.apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: this.getAuthHeaders(),
         timeout: 120000 // 解压可能需要较长时间
       });
 
