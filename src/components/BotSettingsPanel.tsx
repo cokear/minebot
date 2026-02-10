@@ -77,6 +77,8 @@ export function BotSettingsPanel({
     const [panelCookie, setPanelCookie] = useState(pterodactyl?.cookie || "");
     const [panelCsrfToken, setPanelCsrfToken] = useState(pterodactyl?.csrfToken || "");
     const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
+    const [autoRestartEnabled, setAutoRestartEnabled] = useState(pterodactyl?.autoRestart?.enabled || false);
+    const [maxRetries, setMaxRetries] = useState(pterodactyl?.autoRestart?.maxRetries || 3);
 
     const [sftpHost, setSftpHost] = useState(sftpProp?.host || "");
     const [sftpPort, setSftpPort] = useState<string>((sftpProp?.port || 22).toString());
@@ -97,6 +99,8 @@ export function BotSettingsPanel({
         setPanelCookie(pterodactyl?.cookie || "");
         setPanelCsrfToken(pterodactyl?.csrfToken || "");
         setPanelServerId(pterodactyl?.serverId || "");
+        setAutoRestartEnabled(pterodactyl?.autoRestart?.enabled || false);
+        setMaxRetries(pterodactyl?.autoRestart?.maxRetries || 3);
         setSftpHost(sftpProp?.host || "");
         setSftpPort((sftpProp?.port || 22).toString());
         setSftpUsername(sftpProp?.username || "");
@@ -163,7 +167,13 @@ export function BotSettingsPanel({
                 apiKey: panelApiKey,
                 cookie: panelCookie,
                 csrfToken: panelCsrfToken,
-                serverId: panelServerId
+                cookie: panelCookie,
+                csrfToken: panelCsrfToken,
+                serverId: panelServerId,
+                autoRestart: {
+                    enabled: autoRestartEnabled,
+                    maxRetries: maxRetries
+                }
             });
             toast({ title: "翼龙面板配置已保存" });
             onUpdate?.();
@@ -388,11 +398,11 @@ export function BotSettingsPanel({
                             </p>
                         </div>
                         <div className="space-y-2">
-                            <Label>X-CSRF-Token</Label>
+                            <Label>X-CSRF-Token (可选)</Label>
                             <Input
                                 value={panelCsrfToken}
                                 onChange={(e) => setPanelCsrfToken(e.target.value)}
-                                placeholder="抓包获取 CSRF Token"
+                                placeholder="抓包获取 CSRF Token (部分面板可留空)"
                             />
                         </div>
                     </>
@@ -406,11 +416,38 @@ export function BotSettingsPanel({
                         placeholder="abc12345"
                     />
                 </div>
+                )}
+
+                <div className="flex items-center justify-between pt-4 border-t">
+                    <div className="space-y-0.5">
+                        <Label>崩溃自动重启</Label>
+                        <p className="text-xs text-muted-foreground">检测到服务器意外离线时自动开机</p>
+                    </div>
+                    <Switch
+                        checked={autoRestartEnabled}
+                        onCheckedChange={setAutoRestartEnabled}
+                    />
+                </div>
+                {autoRestartEnabled && (
+                    <div className="space-y-2">
+                        <Label>最大重试次数</Label>
+                        <Input
+                            type="number"
+                            value={maxRetries}
+                            onChange={(e) => setMaxRetries(parseInt(e.target.value) || 3)}
+                            min="1"
+                            max="10"
+                        />
+                        <p className="text-xs text-muted-foreground">连续失败多少次后放弃重启</p>
+                    </div>
+                )}
+
                 <Button
                     onClick={handleSavePterodactyl}
                     disabled={loading === "pterodactyl"}
                     className="w-full"
                 >
+
                     {loading === "pterodactyl" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                     保存面板配置
                 </Button>

@@ -40,6 +40,13 @@ export class PanelInstance {
       tcpLatency: null // 延迟毫秒
     };
 
+    // Auto Restart Logic
+    this.autoRestart = {
+      retryCount: 0,
+      lastRestartTime: 0,
+      manualStop: false
+    };
+
     // 为 API 兼容性添加空的 modes 和 autoChatConfig
     this.modes = {};
     this.autoChatConfig = null;
@@ -102,7 +109,7 @@ export class PanelInstance {
     if (!panel || !panel.url || !panel.serverId) return false;
 
     if (panel.authType === 'cookie') {
-      return !!(panel.cookie && panel.csrfToken);
+      return !!panel.cookie;
     }
     return !!panel.apiKey;
   }
@@ -121,8 +128,10 @@ export class PanelInstance {
 
     if (panel.authType === 'cookie') {
       headers['Cookie'] = panel.cookie;
-      headers['X-CSRF-Token'] = panel.csrfToken;
-      headers['X-Xsrf-Token'] = panel.csrfToken; // 尝试兼容两种写法
+      if (panel.csrfToken) {
+        headers['X-CSRF-Token'] = panel.csrfToken;
+        headers['X-Xsrf-Token'] = panel.csrfToken;
+      }
       // 浏览器通常还需要 User-Agent 和 Referer
       headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
       headers['Referer'] = `${panel.url}/server/${panel.serverId}`;
@@ -409,7 +418,6 @@ export class PanelInstance {
     });
 
     const data = response.data.attributes;
-    this.status.panelServerState = data.current_state;
     this.status.panelServerStats = {
       cpuPercent: data.resources?.cpu_absolute || 0,
       memoryBytes: data.resources?.memory_bytes || 0,
@@ -418,6 +426,44 @@ export class PanelInstance {
       networkTx: data.resources?.network_tx_bytes || 0,
       uptime: data.resources?.uptime || 0
     };
+
+    // Auto Restart Check
+    if (this.status.pterodactyl?.autoRestart?.enabled) {
+      const currentState = this.status.panelServerState;
+      const { maxRetries = 3 } = this.status.pterodactyl.autoRestart;
+
+      if (currentState === 'offline' || currentState === 'stopping') {
+        if (currentState === 'offline' && !this.autoRestart.manualStop) {
+          const now = Date.now();
+          // Cooldown: 60s
+          if (now - this.autoRestart.lastRestartTime > 60000) {
+            if (this.autoRestart.retryCount < maxRetries) {
+              this.log('warning', `Detected server offline. Auto-restarting... (${this.autoRestart.retryCount + 1}/${maxRetries})`, '🔄');
+              this.autoRestart.retryCount++;
+              this.autoRestart.lastRestartTime = now;
+              // Trigger restart asynchronously
+              this.sendPowerSignal('start').catch(err => {
+                this.log('error', `Auto-restart failed: ${err.message}`);
+              });
+
+              // Send Telegram Notification
+              this.sendTelegramNotification(`🔄 [自动重启] 服务器 ${this.status.serverName} 意外离线，正在尝试第 ${this.autoRestart.retryCount}/${maxRetries} 次重启...`);
+
+            } else if (this.autoRestart.retryCount === maxRetries) {
+              const msg = `🚫 [自动重启] 服务器 ${this.status.serverName} 重启失败，已达到最大重试次数 (${maxRetries})，停止尝试。`;
+              this.log('error', `Auto-restart gave up after ${maxRetries} attempts.`, '🚫');
+              this.sendTelegramNotification(msg);
+              this.autoRestart.retryCount++; // Increment to prevent log spam
+            }
+          }
+        }
+      } else if (currentState === 'running') {
+        if (this.autoRestart.retryCount > 0) {
+          this.log('success', 'Server is running stable. Resetting auto-restart counters.', '✅');
+          this.autoRestart.retryCount = 0;
+        }
+      }
+    }
 
     // TCP ping 只使用手动配置的地址
     const pingHost = this.config.host;
@@ -476,6 +522,25 @@ export class PanelInstance {
       });
 
       this.log('success', `电源信号已发送: ${signalNames[signal]}`, '⚡');
+
+      // Update manualStop flag
+      if (signal === 'stop' || signal === 'kill') {
+        this.autoRestart.manualStop = true;
+      } else if (signal === 'start' || signal === 'restart') {
+        this.autoRestart.manualStop = false;
+        // Reset retry count on manual start
+        this.autoRestart.retryCount = 0;
+      }
+
+      // 刷新状态
+      setTimeout(() => this.fetchServerStatus().catch(() => { }), 2000);
+      if (signal === 'stop' || signal === 'kill') {
+        this.autoRestart.manualStop = true;
+      } else if (signal === 'start' || signal === 'restart') {
+        this.autoRestart.manualStop = false;
+        // Reset retry count on manual start
+        this.autoRestart.retryCount = 0;
+      }
 
       // 刷新状态
       setTimeout(() => this.fetchServerStatus().catch(() => { }), 2000);
@@ -546,6 +611,9 @@ export class PanelInstance {
       this.log('info', '翼龙面板配置已清除', '🔑');
     } else {
       this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
+      if (config.autoRestart) {
+        this.status.pterodactyl.autoRestart = config.autoRestart;
+      }
       this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
     }
 
@@ -563,7 +631,31 @@ export class PanelInstance {
     // 刷新状态检查（切换到 TCP ping 或面板 API）
     this.refreshStatusCheck();
 
+    // 刷新状态检查（切换到 TCP ping 或面板 API）
+    this.refreshStatusCheck();
+
     return this.status.pterodactyl;
+  }
+
+  /**
+   * 发送 Telegram 通知
+   */
+  async sendTelegramNotification(message) {
+    if (!this.configManager) return;
+
+    try {
+      const config = this.configManager.getFullConfig();
+      const tg = config.telegram;
+
+      if (tg && tg.enabled && tg.botToken && tg.chatId) {
+        await axios.post(`https://api.telegram.org/bot${tg.botToken}/sendMessage`, {
+          chat_id: tg.chatId,
+          text: message
+        }, { timeout: 10000 });
+      }
+    } catch (error) {
+      this.log('error', `Telegram 通知发送失败: ${error.message}`);
+    }
   }
 
   // ==================== 文件管理 API ====================

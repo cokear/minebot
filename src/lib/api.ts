@@ -437,7 +437,7 @@ class ApiService {
   }
 
   // Pterodactyl panel config
-  async setPterodactyl(id: string, config: { url: string; apiKey: string; serverId: string }): Promise<{ success: boolean; pterodactyl: { url: string; apiKey: string; serverId: string } }> {
+  async setPterodactyl(id: string, config: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } }): Promise<{ success: boolean; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } }> {
     return this.request(`/api/bots/${id}/pterodactyl`, {
       method: 'POST',
       body: JSON.stringify(config),
@@ -494,7 +494,7 @@ class ApiService {
   }
 
   // Get bot config
-  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean } }> {
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean } }> {
     return this.request(`/api/bots/${id}/config`);
   }
 
