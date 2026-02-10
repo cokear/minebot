@@ -36,6 +36,10 @@ interface BotSettingsPanelProps {
         cookie?: string;
         csrfToken?: string;
         serverId: string;
+        autoRestart?: {
+            enabled: boolean;
+            maxRetries: number;
+        };
     } | null;
     sftp?: {
         host: string;
@@ -165,8 +169,6 @@ export function BotSettingsPanel({
                 url: panelUrl,
                 authType: panelAuthType,
                 apiKey: panelApiKey,
-                cookie: panelCookie,
-                csrfToken: panelCsrfToken,
                 cookie: panelCookie,
                 csrfToken: panelCsrfToken,
                 serverId: panelServerId,
@@ -416,7 +418,6 @@ export function BotSettingsPanel({
                         placeholder="abc12345"
                     />
                 </div>
-                )}
 
                 <div className="flex items-center justify-between pt-4 border-t">
                     <div className="space-y-0.5">
