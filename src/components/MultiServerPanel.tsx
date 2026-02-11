@@ -192,37 +192,40 @@ function SortableServerCard({
         </h3>
       </div>
 
-      {/* 底部运行状态 (延时和负载) */}
+      {/* 底部运行状态 (三元组网格) */}
       <div className="mt-4">
-        <p className="text-[10px] text-muted-foreground truncate h-4">
-          <span className="flex items-center gap-x-1.5">
-            {server.tcpLatency !== undefined && server.tcpLatency !== null && (
+        <div className="grid grid-cols-3 gap-x-2 text-[10px] text-muted-foreground h-4">
+          {server.tcpLatency !== undefined && server.tcpLatency !== null ? (
+            <div className="flex items-center gap-1 shrink-0">
+              <Zap className="h-3 w-3 text-yellow-500/80" />
+              <span className="tabular-nums">{server.tcpLatency}ms</span>
+            </div>
+          ) : <div />}
+
+          {server.panelServerStats ? (
+            <>
               <div className="flex items-center gap-1 shrink-0">
-                <Zap className="h-3 w-3 text-yellow-500/80" />
-                <span className="tabular-nums">{server.tcpLatency}ms</span>
+                <Cpu className="h-3 w-3 text-blue-500/80" />
+                <span className="tabular-nums">{server.panelServerStats.cpuPercent.toFixed(0)}%</span>
               </div>
-            )}
-            {server.panelServerStats && (
-              <>
-                {(server.tcpLatency !== undefined && server.tcpLatency !== null) && (
-                  <span className="opacity-20 text-[10px] shrink-0">|</span>
-                )}
-                <div className="flex items-center gap-1 shrink-0">
-                  <Cpu className="h-3 w-3 text-blue-500/80" />
-                  <span className="tabular-nums">{server.panelServerStats.cpuPercent.toFixed(0)}%</span>
-                </div>
-                <span className="opacity-20 text-[10px] shrink-0">|</span>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Activity className="h-3 w-3 text-green-500/80" />
-                  <span className="tabular-nums whitespace-nowrap">{formatSize(server.panelServerStats.memoryBytes)}</span>
-                </div>
-              </>
-            )}
-            {!isPanel && !server.tcpLatency && (
-              <span className="opacity-50">运行中</span>
-            )}
-          </span>
-        </p>
+              <div className="flex items-center gap-1 shrink-0">
+                <Activity className="h-3 w-3 text-green-500/80" />
+                <span className="tabular-nums whitespace-nowrap">{formatSize(server.panelServerStats.memoryBytes)}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              {!isPanel && !server.tcpLatency ? (
+                <span className="opacity-50 col-span-2">运行中</span>
+              ) : (
+                <>
+                  <div />
+                  <div />
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* 操作按钮 */}
