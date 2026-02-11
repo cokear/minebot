@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { formatUptime } from "@/lib/utils";
 import { BotControlPanel } from "./BotControlPanel";
 import { BotSettingsPanel } from "./BotSettingsPanel";
 import { FileManager } from "./FileManager";
@@ -243,8 +244,10 @@ export function ServerDetailDialog({
                   }`}
               />
               {server.name || server.id}
-              {isPanel && (
-                <Badge variant="secondary" className="text-xs bg-secondary/50">面板</Badge>
+              {isPanel && server.panelServerStats && (
+                <Badge variant="secondary" className="text-xs bg-secondary/30 font-mono font-normal">
+                  {formatUptime(server.panelServerStats.uptime)}
+                </Badge>
               )}
             </SheetTitle>
             <div className="flex items-center gap-2">
@@ -342,215 +345,215 @@ export function ServerDetailDialog({
                       <div className="flex flex-col gap-1">
                         <span className="text-muted-foreground text-xs uppercase tracking-wider">坐标</span>
                         <span className="font-mono">
-                        X:{Math.floor(server.position.x)} Y:{Math.floor(server.position.y)} Z:{Math.floor(server.position.z)}
-                      </span>
-                    </div>
-                  )}
-                  {server.connected && server.health !== undefined && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wider">状态</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] px-1 h-5 border-green-500/30 text-green-500">HP {Math.floor(server.health)}</Badge>
-                        <Badge variant="outline" className="text-[10px] px-1 h-5 border-orange-500/30 text-orange-500">FD {Math.floor(server.food || 0)}</Badge>
+                          X:{Math.floor(server.position.x)} Y:{Math.floor(server.position.y)} Z:{Math.floor(server.position.z)}
+                        </span>
                       </div>
-                    </div>
-                  )}
-                  {isPanel && server.panelServerStats && server.panelServerState === "running" && (
-                    <>
+                    )}
+                    {server.connected && server.health !== undefined && (
                       <div className="flex flex-col gap-1">
-                        <span className="text-muted-foreground text-xs uppercase tracking-wider">CPU</span>
-                        <span className="font-mono">{server.panelServerStats.cpuPercent.toFixed(1)}%</span>
+                        <span className="text-muted-foreground text-xs uppercase tracking-wider">状态</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-[10px] px-1 h-5 border-green-500/30 text-green-500">HP {Math.floor(server.health)}</Badge>
+                          <Badge variant="outline" className="text-[10px] px-1 h-5 border-orange-500/30 text-orange-500">FD {Math.floor(server.food || 0)}</Badge>
+                        </div>
                       </div>
+                    )}
+                    {isPanel && server.panelServerStats && server.panelServerState === "running" && (
+                      <>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted-foreground text-xs uppercase tracking-wider">CPU</span>
+                          <span className="font-mono">{server.panelServerStats.cpuPercent.toFixed(1)}%</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted-foreground text-xs uppercase tracking-wider">内存</span>
+                          <span className="font-mono">{(server.panelServerStats.memoryBytes / 1024 / 1024).toFixed(0)} MB</span>
+                        </div>
+                      </>
+                    )}
+                    {!isPanel && server.version && (
                       <div className="flex flex-col gap-1">
-                        <span className="text-muted-foreground text-xs uppercase tracking-wider">内存</span>
-                        <span className="font-mono">{(server.panelServerStats.memoryBytes / 1024 / 1024).toFixed(0)} MB</span>
+                        <span className="text-muted-foreground text-xs uppercase tracking-wider">版本</span>
+                        <span className="font-mono">{server.version}</span>
                       </div>
-                    </>
-                  )}
-                  {!isPanel && server.version && (
-                    <div className="flex flex-col gap-1">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wider">版本</span>
-                      <span className="font-mono">{server.version}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bot 控制面板 */}
-              <BotControlPanel
-                botId={server.id}
-                botName={server.username || server.name}
-                connected={server.connected || false}
-                serverType={server.type || "minecraft"}
-                panelServerState={server.panelServerState}
-                modes={server.modes}
-                players={server.players}
-                restartTimer={server.restartTimer}
-                autoChat={server.autoChat}
-                pterodactyl={server.pterodactyl}
-                sftp={server.sftp}
-                fileAccessType={server.fileAccessType}
-                onUpdate={onUpdate}
-              />
-            </TabsContent>
-
-            {/* 配置编辑 */}
-            <TabsContent value="settings" className="mt-0 animate-in slide-in-from-bottom-2 duration-300 h-full overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-              <div className="space-y-8 pb-10">
-                {/* 基本信息编辑 */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium">基本信息</h3>
-                    {!editing && (
-                      <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        编辑
-                      </Button>
                     )}
                   </div>
+                </div>
 
-                  {editing ? (
-                    <div className="space-y-6 p-6 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-                      <div className="grid gap-6">
-                        <div className="space-y-2">
-                          <Label>服务器名称</Label>
-                          <Input
-                            value={editForm.name}
-                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                            placeholder="My Server"
-                            className="bg-background/50"
-                          />
-                        </div>
+                {/* Bot 控制面板 */}
+                <BotControlPanel
+                  botId={server.id}
+                  botName={server.username || server.name}
+                  connected={server.connected || false}
+                  serverType={server.type || "minecraft"}
+                  panelServerState={server.panelServerState}
+                  modes={server.modes}
+                  players={server.players}
+                  restartTimer={server.restartTimer}
+                  autoChat={server.autoChat}
+                  pterodactyl={server.pterodactyl}
+                  sftp={server.sftp}
+                  fileAccessType={server.fileAccessType}
+                  onUpdate={onUpdate}
+                />
+              </TabsContent>
 
-                        {!isPanel && (
+              {/* 配置编辑 */}
+              <TabsContent value="settings" className="mt-0 animate-in slide-in-from-bottom-2 duration-300 h-full overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                <div className="space-y-8 pb-10">
+                  {/* 基本信息编辑 */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium">基本信息</h3>
+                      {!editing && (
+                        <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                          <Pencil className="h-4 w-4 mr-2" />
+                          编辑
+                        </Button>
+                      )}
+                    </div>
+
+                    {editing ? (
+                      <div className="space-y-6 p-6 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+                        <div className="grid gap-6">
                           <div className="space-y-2">
-                            <Label>机器人用户名</Label>
+                            <Label>服务器名称</Label>
                             <Input
-                              value={editForm.username}
-                              onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                              placeholder="Bot Name"
+                              value={editForm.name}
+                              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                              placeholder="My Server"
                               className="bg-background/50"
                             />
                           </div>
-                        )}
-                      </div>
 
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="col-span-2 space-y-2">
-                          <Label>主机地址</Label>
-                          <Input
-                            value={editForm.host}
-                            onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
-                            placeholder="mc.example.com"
-                            className="bg-background/50 font-mono"
-                          />
+                          {!isPanel && (
+                            <div className="space-y-2">
+                              <Label>机器人用户名</Label>
+                              <Input
+                                value={editForm.username}
+                                onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                                placeholder="Bot Name"
+                                className="bg-background/50"
+                              />
+                            </div>
+                          )}
                         </div>
-                        <div className="space-y-2">
-                          <Label>端口</Label>
-                          <Input
-                            value={editForm.port}
-                            onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
-                            placeholder="25565"
-                            className="bg-background/50 font-mono"
-                          />
-                        </div>
-                      </div>
 
-                      <div className="flex gap-3 justify-end pt-2">
-                        <Button variant="ghost" onClick={() => setEditing(false)} disabled={loading}>
-                          取消
-                        </Button>
-                        <Button onClick={handleSave} disabled={loading}>
-                          {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          保存基本信息
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-                      <dl className="grid grid-cols-1 gap-y-4 text-sm">
-                        <div className="grid grid-cols-3">
-                          <dt className="text-muted-foreground">显示名称</dt>
-                          <dd className="col-span-2 font-medium">{server.name || "-"}</dd>
-                        </div>
-                        <div className="grid grid-cols-3">
-                          <dt className="text-muted-foreground">服务器类型</dt>
-                          <dd className="col-span-2">{isPanel ? "纯面板托管" : "Minecraft 游戏服务器"}</dd>
-                        </div>
-                        {!isPanel && (
-                          <div className="grid grid-cols-3">
-                            <dt className="text-muted-foreground">机器人名称</dt>
-                            <dd className="col-span-2 font-mono">{server.username || "自动生成"}</dd>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="col-span-2 space-y-2">
+                            <Label>主机地址</Label>
+                            <Input
+                              value={editForm.host}
+                              onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
+                              placeholder="mc.example.com"
+                              className="bg-background/50 font-mono"
+                            />
                           </div>
-                        )}
-                        <div className="grid grid-cols-3">
-                          <dt className="text-muted-foreground">连接地址</dt>
-                          <dd className="col-span-2 font-mono">{server.host}:{server.port}</dd>
+                          <div className="space-y-2">
+                            <Label>端口</Label>
+                            <Input
+                              value={editForm.port}
+                              onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
+                              placeholder="25565"
+                              className="bg-background/50 font-mono"
+                            />
+                          </div>
                         </div>
-                      </dl>
-                    </div>
-                  )}
-                </div>
 
-                {/* 高级功能设置 */}
-                <div className="space-y-4 pt-4 border-t border-border/50">
-                  <h3 className="text-lg font-medium">高级功能</h3>
-                  <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-                    <BotSettingsPanel
-                      botId={server.id}
-                      restartTimer={server.restartTimer}
-                      autoChat={server.autoChat}
-                      pterodactyl={server.pterodactyl}
-                      sftp={server.sftp}
-                      fileAccessType={server.fileAccessType}
-                      onUpdate={onUpdate}
-                    />
+                        <div className="flex gap-3 justify-end pt-2">
+                          <Button variant="ghost" onClick={() => setEditing(false)} disabled={loading}>
+                            取消
+                          </Button>
+                          <Button onClick={handleSave} disabled={loading}>
+                            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            保存基本信息
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+                        <dl className="grid grid-cols-1 gap-y-4 text-sm">
+                          <div className="grid grid-cols-3">
+                            <dt className="text-muted-foreground">显示名称</dt>
+                            <dd className="col-span-2 font-medium">{server.name || "-"}</dd>
+                          </div>
+                          <div className="grid grid-cols-3">
+                            <dt className="text-muted-foreground">服务器类型</dt>
+                            <dd className="col-span-2">{isPanel ? "纯面板托管" : "Minecraft 游戏服务器"}</dd>
+                          </div>
+                          {!isPanel && (
+                            <div className="grid grid-cols-3">
+                              <dt className="text-muted-foreground">机器人名称</dt>
+                              <dd className="col-span-2 font-mono">{server.username || "自动生成"}</dd>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3">
+                            <dt className="text-muted-foreground">连接地址</dt>
+                            <dd className="col-span-2 font-mono">{server.host}:{server.port}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 高级功能设置 */}
+                  <div className="space-y-4 pt-4 border-t border-border/50">
+                    <h3 className="text-lg font-medium">高级功能</h3>
+                    <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+                      <BotSettingsPanel
+                        botId={server.id}
+                        restartTimer={server.restartTimer}
+                        autoChat={server.autoChat}
+                        pterodactyl={server.pterodactyl}
+                        sftp={server.sftp}
+                        fileAccessType={server.fileAccessType}
+                        onUpdate={onUpdate}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            {/* 日志面板 */}
-            <TabsContent value="logs" className="mt-0 h-full flex flex-col animate-in slide-in-from-bottom-2 duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-medium">实时日志 ({logs.length})</span>
-                <Button variant="ghost" size="sm" onClick={clearLogs} className="h-8 text-muted-foreground hover:text-destructive">
-                  <Trash className="h-4 w-4 mr-2" />
-                  清空
-                </Button>
-              </div>
-              <div className="flex-1 rounded-xl border border-border/50 bg-black/40 overflow-hidden relative">
-                <div className="absolute inset-0 overflow-auto p-4 font-mono text-xs space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                  {logs.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
-                      <Terminal className="h-8 w-8 opacity-20" />
-                      <p>暂无日志记录</p>
-                    </div>
-                  ) : (
-                    logs.slice(-100).map((log) => (
-                      <div
-                        key={log.id}
-                        className={`flex items-start gap-3 py-0.5 ${log.type === "error" ? "text-red-400" :
-                          log.type === "warning" ? "text-yellow-400" :
-                            log.type === "success" ? "text-emerald-400" :
-                              log.type === "chat" ? "text-purple-400" :
-                                "text-zinc-400"
-                          }`}
-                      >
-                        <span className="shrink-0 opacity-40 select-none w-[70px] text-[10px] mt-[1px] font-sans text-right">
-                          {log.timestamp.split('T')[1]?.split('.')[0] || log.timestamp}
-                        </span>
-                        <div className="flex-1 break-all leading-relaxed">
-                          {log.icon && <span className="mr-2 opacity-80">{log.icon}</span>}
-                          {log.message}
-                        </div>
-                      </div>
-                    ))
-                  )}
+              {/* 日志面板 */}
+              <TabsContent value="logs" className="mt-0 h-full flex flex-col animate-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm font-medium">实时日志 ({logs.length})</span>
+                  <Button variant="ghost" size="sm" onClick={clearLogs} className="h-8 text-muted-foreground hover:text-destructive">
+                    <Trash className="h-4 w-4 mr-2" />
+                    清空
+                  </Button>
                 </div>
-              </div>
-            </TabsContent>
-          </div>
+                <div className="flex-1 rounded-xl border border-border/50 bg-black/40 overflow-hidden relative">
+                  <div className="absolute inset-0 overflow-auto p-4 font-mono text-xs space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                    {logs.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
+                        <Terminal className="h-8 w-8 opacity-20" />
+                        <p>暂无日志记录</p>
+                      </div>
+                    ) : (
+                      logs.slice(-100).map((log) => (
+                        <div
+                          key={log.id}
+                          className={`flex items-start gap-3 py-0.5 ${log.type === "error" ? "text-red-400" :
+                            log.type === "warning" ? "text-yellow-400" :
+                              log.type === "success" ? "text-emerald-400" :
+                                log.type === "chat" ? "text-purple-400" :
+                                  "text-zinc-400"
+                            }`}
+                        >
+                          <span className="shrink-0 opacity-40 select-none w-[70px] text-[10px] mt-[1px] font-sans text-right">
+                            {log.timestamp.split('T')[1]?.split('.')[0] || log.timestamp}
+                          </span>
+                          <div className="flex-1 break-all leading-relaxed">
+                            {log.icon && <span className="mr-2 opacity-80">{log.icon}</span>}
+                            {log.message}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            </div>
           )}
         </Tabs>
       </SheetContent>

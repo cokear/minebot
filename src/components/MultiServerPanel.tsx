@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { formatUptime } from "@/lib/utils";
 import { ServerDetailDialog } from "./ServerDetailDialog";
 import {
   DndContext,
@@ -142,13 +143,14 @@ function SortableServerCard({
     zIndex: isDragging ? 1000 : 1,
   };
 
+  const isPanel = server.type === "panel";
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer group ${
-        isDragging ? "shadow-lg" : ""
-      }`}
+      className={`relative p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer group ${isDragging ? "shadow-lg" : ""
+        }`}
       onClick={() => openDetail(server)}
     >
       {/* 拖拽手柄 */}
@@ -172,9 +174,9 @@ function SortableServerCard({
             {getStatusText(server)}
           </Badge>
         </div>
-        {server.type === "panel" && (
-          <Badge variant="outline" className="text-xs">
-            面板
+        {server.type === "panel" && server.panelServerStats && (
+          <Badge variant="secondary" className="text-xs bg-secondary/30 font-mono font-normal">
+            {formatUptime(server.panelServerStats.uptime)}
           </Badge>
         )}
       </div>
@@ -184,23 +186,29 @@ function SortableServerCard({
         {server.name || server.id}
       </h3>
 
-      {/* 服务器地址 */}
-      <p className="text-sm text-muted-foreground truncate mb-1 font-mono pl-5">
-        {server.type === "panel" && server.serverHost
-          ? `${server.serverHost}:${server.serverPort}`
-          : server.host
-            ? `${server.host}:${server.port}`
-            : "未配置地址"}
-      </p>
+      {/* 服务器地址 (面板服务器隐藏) */}
+      {!isPanel && (
+        <p className="text-sm text-muted-foreground truncate mb-1 font-mono pl-5">
+          {server.host ? `${server.host}:${server.port}` : "未配置地址"}
+        </p>
+      )}
 
-      {/* 用户名或延迟 */}
-      <p className="text-xs text-muted-foreground truncate pl-5">
+      {/* 用户名或运行状态 (面板服务器显示负载和延迟) */}
+      <p className="text-xs text-muted-foreground truncate pl-5 h-4">
         {server.type === "panel"
-          ? server.tcpLatency
-            ? `延迟: ${server.tcpLatency}ms`
-            : server.panelServerStats
-              ? `CPU: ${server.panelServerStats.cpuPercent.toFixed(0)}%`
-              : ""
+          ? (
+            <span className="flex items-center gap-2">
+              {server.tcpLatency !== undefined && server.tcpLatency !== null && (
+                <span>延时: {server.tcpLatency}ms</span>
+              )}
+              {server.panelServerStats && (
+                <>
+                  {server.tcpLatency !== undefined && server.tcpLatency !== null && <span className="opacity-30">|</span>}
+                  <span>负载: {server.panelServerStats.cpuPercent.toFixed(0)}%</span>
+                </>
+              )}
+            </span>
+          )
           : server.username || "随机用户名"}
       </p>
 
