@@ -121,6 +121,11 @@ class ProxyService {
                 outbound.password = node.password;
                 outbound.congestion_control = 'bbr';
                 if (!outbound.tls) outbound.tls = { enabled: true };
+
+                // Disable uTLS for TUIC as it causes "unsupported usage" error in some sing-box versions/QUIC
+                if (outbound.tls.utls) {
+                    delete outbound.tls.utls;
+                }
             }
 
             return outbound;
