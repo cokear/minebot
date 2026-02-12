@@ -91,8 +91,10 @@ class ProxyService {
                 // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
                 outbound.tls.utls = {
                     enabled: true,
-                    fingerprint: node.fp || 'chrome' // Reverting to most common default
+                    fingerprint: node.fp || 'chrome'
                 };
+
+                outbound.tls.record_fragment = true; // Restoring for CDN handshake stability
 
                 // Add alpn only if explicitly present
                 if (node.alpn) {
@@ -125,14 +127,16 @@ class ProxyService {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
 
-                // Handle Early Data (0-RTT) - Matching v2rayN working JSON
+                // Handle Early Data (0-RTT) - Matching v2rayN working JSON for Argo
                 const edMatch = outbound.transport.path.match(/ed=(\d+)/);
+                const isArgo = outbound.transport.path.toLowerCase().includes('argo') || node.name.toLowerCase().includes('argo');
+
                 if (edMatch) {
                     outbound.transport.max_early_data = parseInt(edMatch[1]);
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
-                } else if (outbound.transport.path.includes('ed=')) {
-                    // Default to 2048 for Argo if ed= exists but has no value
-                    outbound.transport.max_early_data = 2048;
+                } else if (isArgo || outbound.transport.path.includes('ed=')) {
+                    // Default to 2560 for Argo nodes (Hetzner/Modal typically use this in working configs)
+                    outbound.transport.max_early_data = 2560;
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
                 }
                 // Removing the "|| isTls" default for 2560 to prevent 404/400 on non-Argo nodes
@@ -202,8 +206,8 @@ class ProxyService {
             servers: [
                 {
                     tag: 'google',
-                    address: 'tls://8.8.8.8',
-                    detour: this.nodes.length > 0 ? `out-${this.nodes[0].id}` : 'direct'
+                    address: 'https://8.8.8.8/dns-query',
+                    detour: 'direct' // Simplified for environment stability
                 },
                 {
                     tag: 'local',
