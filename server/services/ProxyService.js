@@ -39,9 +39,7 @@ class ProxyService {
             type: 'socks',
             tag: `in-${node.id}`,
             listen: '127.0.0.1',
-            listen_port: this.basePort + index,
-            sniff: true,
-            sniff_override_destination: true
+            listen_port: this.basePort + index
         }));
 
         const outbounds = this.nodes.map(node => {
@@ -118,9 +116,7 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    }
+                    headers: {}
                 };
 
                 // Host header logic: prefer wsHost, then sni, fallback to server if it's a domain
@@ -379,7 +375,7 @@ class ProxyService {
             if (params.get('spx')) config.spx = params.get('spx');
             if (params.get('flow')) config.flow = params.get('flow');
 
-            // Capture critical v2rayN alignment params
+            // Capture critical parameters directly from URI
             if (params.get('packet_encoding')) config.packet_encoding = params.get('packet_encoding');
             if (params.get('ed')) config.max_early_data = params.get('ed');
             if (params.get('max_early_data')) config.max_early_data = params.get('max_early_data');
