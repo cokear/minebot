@@ -92,8 +92,7 @@ class ProxyService {
                     fingerprint: node.fp || 'firefox'
                 };
 
-                // record_fragment can be unstable in Docker/MTU envs, disabling to match standard v2rayN baseline
-                // unless explicitly needed
+                outbound.tls.record_fragment = true; // Restoring for v2rayN parity after 404 check
 
                 // Add alpn only if explicitly present
                 if (node.alpn) {
@@ -120,8 +119,8 @@ class ProxyService {
                     }
                 };
 
-                // Host header logic: prefer wsHost, then sni (Matching v2rayN)
-                const hostHeader = node.wsHost || node.sni;
+                // Host header logic: prefer wsHost, then sni, fallback to server if it's a domain
+                const hostHeader = node.wsHost || node.sni || node.server;
                 if (hostHeader && !hostHeader.match(/^\d+\.\d+\.\d+\.\d+$/)) {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
@@ -131,11 +130,12 @@ class ProxyService {
                 if (edMatch) {
                     outbound.transport.max_early_data = parseInt(edMatch[1]);
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
-                } else if (outbound.transport.path.includes('ed=') || isTls) {
-                    // Default to 2560 for WS+TLS typical of Cloudflare/Argo as seen in JSON
-                    outbound.transport.max_early_data = 2560;
+                } else if (outbound.transport.path.includes('ed=')) {
+                    // Default to 2048 for Argo if ed= exists but has no value
+                    outbound.transport.max_early_data = 2048;
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
                 }
+                // Removing the "|| isTls" default for 2560 to prevent 404/400 on non-Argo nodes
             } else if (node.transport === 'grpc') {
                 outbound.transport = {
                     type: 'grpc',

@@ -11,5 +11,5 @@ def run_cmd(cmd):
     return res.returncode
 
 run_cmd("git add .")
-run_cmd('git commit -m "fix: v15 structural reliability (DNS block, IP routing, VMess none security)"')
+run_cmd('git commit -m "fix: v16 precision alignment (Host fallback, conditional early data, record_fragment)"')
 run_cmd("git push origin main")
