@@ -473,7 +473,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
             {selectedNode && (
                 <Dialog open={!!selectedNode} onOpenChange={(open) => !open && setSelectedNode(null)}>
                     <DialogContent
-                        className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col p-6 gap-0 z-[100]"
+                        className="sm:max-w-[500px] max-h-[90vh] overflow-hidden flex flex-col p-6 gap-0 z-[100] top-[15%] translate-y-0"
                         overlayClassName="z-[100]"
                     >
                         <DialogHeader className="mb-4">
