@@ -584,7 +584,14 @@ export class PanelInstance {
         baseUrl = baseUrl.slice(0, -11); // Remove last 11 chars
       }
 
-      const url = `${baseUrl}/api/client/servers/${panel.serverId}/command`;
+      // 2. Extract Short Identifier if full UUID is provided (Pterodactyl uses 8-char identifier)
+      let targetId = panel.serverId;
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId)) {
+        targetId = targetId.split('-')[0];
+        this.log('warn', `Server ID appears to be a full UUID. Auto-truncating to identifier: ${targetId}`, '🔧');
+      }
+
+      const url = `${baseUrl}/api/client/servers/${targetId}/command`;
 
       this.log('info', `发送面板命令: ${command} -> ${url}`, '🖥️');
 

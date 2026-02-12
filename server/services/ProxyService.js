@@ -115,6 +115,8 @@ class ProxyService {
                 if (hostHeader) {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
+                // Add User-Agent to prevent 502 from some CDNs (Cloudflare sometimes blocks empty UA)
+                outbound.transport.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
             } else if (node.transport === 'grpc') {
                 outbound.transport = {
                     type: 'grpc',
