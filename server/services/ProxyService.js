@@ -89,10 +89,8 @@ class ProxyService {
                 // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
                 outbound.tls.utls = {
                     enabled: true,
-                    fingerprint: node.fp || 'firefox'
+                    fingerprint: node.fp || 'chrome' // Reverting to most common default
                 };
-
-                outbound.tls.record_fragment = true; // Restoring for v2rayN parity after 404 check
 
                 // Add alpn only if explicitly present
                 if (node.alpn) {
