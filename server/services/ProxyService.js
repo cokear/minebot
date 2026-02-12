@@ -14,8 +14,10 @@ class ProxyService {
         this.nodes = [];
         // Use process.cwd() for definitive root on Windows
         this.projectRoot = process.cwd();
-        this.configPath = path.join(this.projectRoot, 'server/data/proxy_config.json');
-        console.log('[ProxyService] Initialized with dynamic config path:', this.configPath);
+        // Fix: Use __dirname to find data dir relative to this service file, strictly safe for Docker
+        // __dirname is server/services/, so ../data resolves to server/data/
+        this.configPath = path.join(__dirname, '../data/proxy_config.json');
+        console.log('[ProxyService] Initialized. CWD:', this.projectRoot, 'Config:', this.configPath);
         this.binPath = process.platform === 'win32' ? 'sing-box.exe' : 'sing-box';
         this.basePort = 20000;
         this.nodePortMap = new Map(); // nodeId -> localPort
@@ -41,7 +43,7 @@ class ProxyService {
         const inbounds = this.nodes.map((node, index) => ({
             type: 'socks',
             tag: `in-${node.id}`,
-            listen: '127.0.0.1',
+            listen: '127.0.0.1', // Ensure binding to localhost
             listen_port: this.basePort + index,
             sniffing: {
                 enabled: false // Disable sniffing
@@ -261,10 +263,20 @@ class ProxyService {
 
             // Try multiple paths for sing-box bin
             let execPath = this.binPath;
+            // Docker environment: projectRoot is /app/server
+            // We want to look in:
+            // 1. /app/server/bin/sing-box (if local bin)
+            // 2. /app/bin/sing-box (if project bin)
+            // 3. System PATH (apk installed)
+
+            const projectRootParent = path.dirname(this.projectRoot); // /app if root is /app/server
+
             const possiblePaths = [
-                path.join(this.projectRoot, 'server/bin', this.binPath),
                 path.join(this.projectRoot, 'bin', this.binPath),
-                path.join(this.projectRoot, this.binPath), // Root check
+                path.join(this.projectRoot, 'server/bin', this.binPath),
+                path.join(projectRootParent, 'bin', this.binPath), // Check ../bin
+                '/usr/bin/' + this.binPath, // Common linux install path
+                '/usr/local/bin/' + this.binPath,
                 this.binPath // Fallback to PATH
             ];
 
