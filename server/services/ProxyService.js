@@ -159,6 +159,10 @@ class ProxyService {
                 console.error(`[Proxy Error] ${data}`);
             });
 
+            this.proxyProcess.on('error', (err) => {
+                console.error(`[ProxyService] Failed to start sing-box process:`, err.message);
+            });
+
             this.proxyProcess.on('close', (code) => {
                 if (code !== 0 && code !== null) {
                     console.error(`[ProxyService] sing-box exited with code ${code}`);
@@ -288,14 +292,18 @@ class ProxyService {
         try {
             const agent = new SocksProxyAgent(`socks5://127.0.0.1:${localPort}`);
             // Use a small, reliable resource to test
+            // proxy: false is critical to prevent axios from using global env proxies
             await axios.get('http://cp.cloudflare.com/generate_204', {
                 httpAgent: agent,
                 httpsAgent: agent,
-                timeout: 5000
+                timeout: 5000,
+                proxy: false
             });
             return Date.now() - startTime;
         } catch (e) {
-            console.error(`[ProxyService] Test failed for ${nodeId}:`, e.message);
+            // Detailed error for debugging failed tests
+            const reason = e.response ? `HTTP ${e.response.status}` : e.message;
+            console.error(`[ProxyService] Test failed for ${nodeId} on port ${localPort}:`, reason);
             return -1; // Indicates failure
         }
     }
