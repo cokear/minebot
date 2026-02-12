@@ -595,9 +595,25 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                                         ...(selectedNode.security === 'tls' && {
                                             tls: { enabled: true, server_name: selectedNode.sni || selectedNode.server, utls: { enabled: true, fingerprint: 'chrome' } }
                                         }),
-                                        ...(selectedNode.transport === 'ws' && {
-                                            transport: { type: 'ws', path: selectedNode.wsPath || '/', headers: { Host: selectedNode.wsHost || selectedNode.sni || selectedNode.server } }
-                                        })
+                                        ...(selectedNode.transport === 'ws' && (() => {
+                                            const wsPath = selectedNode.wsPath || '/';
+                                            let maxEarlyData = selectedNode.max_early_data;
+                                            if (maxEarlyData === undefined && wsPath.includes('ed=')) {
+                                                const match = wsPath.match(/[?&]ed=(\d+)/);
+                                                if (match) maxEarlyData = parseInt(match[1]);
+                                            }
+                                            return {
+                                                transport: {
+                                                    type: 'ws',
+                                                    path: wsPath,
+                                                    headers: { Host: selectedNode.wsHost || selectedNode.sni || selectedNode.server },
+                                                    ...(maxEarlyData && {
+                                                        max_early_data: maxEarlyData,
+                                                        early_data_header_name: 'Sec-WebSocket-Protocol'
+                                                    })
+                                                }
+                                            };
+                                        })())
                                     }, null, 2)}
                                 </pre>
                             </div>
