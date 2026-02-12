@@ -38,18 +38,10 @@ WORKDIR /app
 # Install minimal runtime dependencies (if any)
 # minebot itself only needs nodejs, but some native modules might need libs
 # Usually alpine is enough for pure node apps
-RUN apk add --no-cache tzdata curl tar
+RUN apk add --no-cache tzdata curl ca-certificates
 
-# Download and install sing-box
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then SB_ARCH="linux-amd64"; \
-    elif [ "$ARCH" = "aarch64" ]; then SB_ARCH="linux-arm64"; \
-    else SB_ARCH="linux-amd64"; fi && \
-    VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/') && \
-    curl -L -o sing-box.tar.gz "https://github.com/SagerNet/sing-box/releases/download/v${VERSION}/sing-box-${VERSION}-${SB_ARCH}.tar.gz" && \
-    tar -xzf sing-box.tar.gz && \
-    mv sing-box-*/sing-box /usr/local/bin/ && \
-    rm -rf sing-box.tar.gz sing-box-*
+# Install sing-box from edge community repo
+RUN apk add --no-cache sing-box --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
 
 # Copy server dependencies from stage 2
 COPY --from=server-deps /app/server/node_modules ./server/node_modules
