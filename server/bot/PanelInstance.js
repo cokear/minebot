@@ -99,7 +99,9 @@ export class PanelInstance {
       autoChat: null,
       behaviors: null,
       sftp: this.status.sftp,
-      fileAccessType: this.status.fileAccessType
+      fileAccessType: this.status.fileAccessType,
+      proxyNodeId: this.config.proxyNodeId || '',
+      autoReconnect: !!this.config.autoReconnect
     };
   }
 

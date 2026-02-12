@@ -154,7 +154,9 @@ export class BotInstance {
       username: this.status.username || this.config.username,
       modes: this.modes,
       autoChat: this.autoChatConfig,
-      behaviors: this.behaviors?.getStatus() || null
+      behaviors: this.behaviors?.getStatus() || null,
+      proxyNodeId: this.config.proxyNodeId || '',
+      autoReconnect: !!this.config.autoReconnect
     };
   }
 
