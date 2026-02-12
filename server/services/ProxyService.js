@@ -113,7 +113,9 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {}
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
                 };
 
                 // Host header logic: prefer wsHost, then sni (Matching v2rayN)
@@ -459,7 +461,7 @@ class ProxyService {
             await axios.get('http://cp.cloudflare.com/generate_204', {
                 httpAgent: agent,
                 httpsAgent: agent,
-                timeout: 5000,
+                timeout: 10000,
                 proxy: false
             });
             return Date.now() - startTime;
