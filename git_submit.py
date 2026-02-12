@@ -16,7 +16,7 @@ def run_command(command):
 
 def main():
     run_command(["git", "add", "."])
-    run_command(["git", "commit", "-m", "fix: disable tuic utls to prevent unsupported usage error"])
+    run_command(["git", "commit", "-m", "feat: refactor proxy parser to match python robustness"])
     run_command(["git", "push", "origin", "main"])
 
 if __name__ == "__main__":

@@ -74,11 +74,13 @@ class ProxyService {
                 outbound.tls = {
                     enabled: true,
                     server_name: node.sni || node.server,
-                    utls: { enabled: true, fingerprint: node.fp || 'chrome' }
+                    utls: { enabled: true, fingerprint: node.fp || 'chrome' },
+                    insecure: !!node.insecure
                 };
 
+                // Add alpn if present
                 if (node.alpn) {
-                    outbound.tls.alpn = node.alpn.split(',').map(s => s.trim());
+                    outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : node.alpn.split(',');
                 }
 
                 if (node.security === 'reality') {
@@ -91,7 +93,7 @@ class ProxyService {
                 }
             }
 
-            // Handle Transport (WS)
+            // Handle Transport (WS/GRPC)
             if (node.transport === 'ws') {
                 outbound.transport = {
                     type: 'ws',
@@ -100,11 +102,27 @@ class ProxyService {
                         'Host': node.wsHost || node.server
                     }
                 };
+            } else if (node.transport === 'grpc') {
+                outbound.transport = {
+                    type: 'grpc',
+                    service_name: node.serviceName || ''
+                };
+            }
+
+            // Handle VLESS Flow
+            if (node.type === 'vless' && node.flow) {
+                outbound.flow = node.flow;
             }
 
             // Handle Hysteria2 specific
             if (node.type === 'hysteria2') {
                 outbound.password = node.password;
+                if (node.obfs) {
+                    outbound.obfs = {
+                        type: node.obfs,
+                        password: node.obfs_password || ''
+                    };
+                }
             }
 
             // Handle TUIC
@@ -119,7 +137,9 @@ class ProxyService {
 
                 outbound.uuid = tuicUuid;
                 outbound.password = node.password;
-                outbound.congestion_control = 'bbr';
+                outbound.congestion_control = node.congestion_control || 'bbr';
+                outbound.udp_relay_mode = node.udp_relay_mode || 'quic-rfc';
+
                 if (!outbound.tls) outbound.tls = { enabled: true };
 
                 // Disable uTLS for TUIC as it causes "unsupported usage" error in some sing-box versions/QUIC
@@ -227,8 +247,17 @@ class ProxyService {
     }
 
     // Parse proxy links (vless, vmess, ss, trojan, tuic, hysteria2)
+    // Refactored based on robust python implementation
     parseProxyLink(link) {
         try {
+            link = link.trim();
+            // Handle JSON config directly if pasted
+            if (link.startsWith('{') && link.endsWith('}')) {
+                // Not supported in this UI flow yet, but good to have constraint
+                return null;
+            }
+
+            // Handle VMess (Base64/JSON)
             if (link.startsWith('vmess://')) {
                 const b64 = link.replace('vmess://', '');
                 const json = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
@@ -239,22 +268,23 @@ class ProxyService {
                     server: json.add,
                     port: parseInt(json.port),
                     uuid: json.id,
-                    transport: json.net === 'ws' ? 'ws' : 'tcp',
+                    security: json.scy || 'auto',
+                    alertId: parseInt(json.aid || 0),
+                    transport: json.net === 'ws' ? 'ws' : (json.net === 'grpc' ? 'grpc' : 'tcp'),
                     wsPath: json.path || '',
                     wsHost: json.host || '',
-                    security: json.tls === 'tls' ? 'tls' : 'none',
+                    // tls mapped to boolean/object in config generation
+                    // Here we store raw to help UI or config generation
+                    tls: json.tls === 'tls',
                     sni: json.sni || json.host || ''
                 };
             }
 
             const url = new URL(link);
-            const protocol = url.protocol.slice(0, -1);
+            const protocol = url.protocol.slice(0, -1).toLowerCase();
             const nodeId = Math.random().toString(36).substring(2, 9);
             const name = decodeURIComponent(url.hash.slice(1)) || `${protocol}_${nodeId}`;
-
-            // Decoding userinfo part (e.g., uuid:pass or method:pass)
-            let userInfo = decodeURIComponent(url.username);
-            let [user, pass] = userInfo.split(':');
+            const params = new URLSearchParams(url.search);
 
             let config = {
                 id: nodeId,
@@ -264,45 +294,89 @@ class ProxyService {
                 port: parseInt(url.port)
             };
 
-            const params = new URLSearchParams(url.search);
-
-            // Common params
+            // Common TLS/Network params
             if (params.get('sni')) config.sni = params.get('sni');
-            if (params.get('security')) config.security = params.get('security');
+            if (params.get('security')) config.security = params.get('security'); // tls/reality
             if (params.get('type')) config.transport = params.get('type');
             if (params.get('path')) config.wsPath = params.get('path');
             if (params.get('host')) config.wsHost = params.get('host');
+            if (params.get('serviceName')) config.serviceName = params.get('serviceName'); // grpc
             if (params.get('fp')) config.fp = params.get('fp');
             if (params.get('pbk')) config.pbk = params.get('pbk');
             if (params.get('sid')) config.sid = params.get('sid');
             if (params.get('spx')) config.spx = params.get('spx');
+            if (params.get('flow')) config.flow = params.get('flow');
 
-            if (protocol === 'vless') {
-                config.uuid = user;
+            // Insecure flag (allowInsecure)
+            if (params.get('insecure') === '1' || params.get('insecure') === 'true') {
+                config.insecure = true;
+            }
+
+            // User Info Decoding
+            const rawUser = decodeURIComponent(url.username || '');
+            const rawPass = decodeURIComponent(url.password || '');
+
+            if (protocol === 'tuic') {
+                // tuic://uuid:password@host:port (Standard) OR tuic://uuid:password@host (No separate pass in URL)
+                if (rawUser.includes(':')) {
+                    const [uuid, password] = rawUser.split(':', 2);
+                    config.uuid = uuid;
+                    config.password = password;
+                } else {
+                    config.uuid = rawUser;
+                    config.password = rawPass;
+                }
+                config.congestion_control = params.get('congestion_control') || 'bbr';
+                config.udp_relay_mode = params.get('udp_relay_mode') || 'quic-rfc';
+                config.alpn = params.get('alpn') || undefined;
+
+            } else if (protocol === 'hysteria2' || protocol === 'hy2') {
+                config.type = 'hysteria2';
+                config.password = rawUser || rawPass; // hy2 usually puts auth in username
+                config.obfs = params.get('obfs');
+                config.obfs_password = params.get('obfs-password');
+
+            } else if (protocol === 'vless') {
+                config.uuid = rawUser;
+
             } else if (protocol === 'trojan') {
-                config.password = user;
-            } else if (protocol === 'ss') {
-                // ss://base64(method:password)@host:port
-                let auth = url.username;
-                try {
-                    // Try decoding if it looks like base64
-                    if (!auth.includes(':')) {
-                        auth = Buffer.from(auth, 'base64').toString('utf-8');
-                    }
-                } catch (e) { }
-                const [method, password] = auth.split(':');
+                config.password = rawUser;
+
+            } else if (protocol === 'ss' || protocol === 'shadowsocks') {
                 config.type = 'shadowsocks';
-                config.password = password || user;
-                config.method = method || 'aes-256-gcm';
-            } else if (protocol === 'tuic') {
-                config.uuid = user;
-                config.password = pass || user;
-            } else if (protocol === 'hysteria2') {
-                config.password = user;
-            } else if (protocol === 'socks' || protocol === 'http') {
-                if (user) config.username = user;
-                if (pass) config.password = pass;
+                // ss://base64(method:password)@host:port
+                // Sometimes it is ss://method:password@host:port
+                if (rawUser && !rawPass && !rawUser.includes(':')) {
+                    // Start with assumption it's base64
+                    try {
+                        const decoded = Buffer.from(rawUser, 'base64').toString('utf-8');
+                        if (decoded.includes(':')) {
+                            const [m, p] = decoded.split(':', 2);
+                            config.method = m;
+                            config.password = p;
+                        } else {
+                            // Fallback, maybe just method? Unlikely.
+                            config.method = rawUser;
+                        }
+                    } catch (e) {
+                        config.method = rawUser;
+                    }
+                } else {
+                    // Standard method:password
+                    config.method = rawUser;
+                    config.password = rawPass;
+                }
+                // Handle params for plugin/obfs if needed (not in python script but good to keep in mind)
+
+            } else if (protocol === 'socks5' || protocol === 'socks') {
+                config.type = 'socks';
+                config.username = rawUser;
+                config.password = rawPass;
+            } else if (protocol === 'http') {
+                config.username = rawUser;
+                config.password = rawPass;
             } else {
+                console.warn('[ProxyService] Unknown protocol:', protocol);
                 return null;
             }
 
