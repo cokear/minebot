@@ -578,8 +578,11 @@ export class PanelInstance {
     }
 
     try {
-      const url = `${panel.url}/api/client/servers/${panel.serverId}/command`;
-      this.log('info', `发送控制台命令: ${command}`, '🖥️');
+      // Clean panel URL (ensure no trailing slash and correct prefix)
+      const baseUrl = panel.url.replace(/\/+$/, '');
+      const url = `${baseUrl}/api/client/servers/${panel.serverId}/command`;
+
+      this.log('info', `发送面板命令: ${command} -> ${url}`, '🖥️');
 
       await axios.post(url, { command }, this.getHttpOptions());
 

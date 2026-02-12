@@ -52,7 +52,15 @@ class ProxyService {
 
             // Add protocol specific fields
             if (node.password) outbound.password = node.password;
-            if (node.uuid) outbound.uuid = node.uuid;
+
+            // Sanitize UUID (handle potential lingering URL-encoded colons or concatenated pass)
+            if (node.uuid) {
+                let uuid = node.uuid;
+                if (uuid.includes('%3A') || uuid.includes(':')) {
+                    uuid = decodeURIComponent(uuid).split(':')[0];
+                }
+                outbound.uuid = uuid;
+            }
 
             // Protocol specific tuning
             if (node.type === 'vmess') {
