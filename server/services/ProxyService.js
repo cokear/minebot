@@ -69,7 +69,8 @@ class ProxyService {
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             } else if (node.type === 'vless') {
-                // Keep it pure by default to match v2rayN unless explicitly requested
+                // v2rayN working config uses xudp for VLESS
+                outbound.packet_encoding = 'xudp';
             }
 
             // Handle Security (TLS / Reality)
@@ -85,8 +86,12 @@ class ProxyService {
                 };
 
                 // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
-                // Default to chrome if not specified
-                outbound.tls.utls = { enabled: true, fingerprint: node.fp || 'chrome' };
+                outbound.tls.utls = {
+                    enabled: true,
+                    fingerprint: node.fp || 'firefox' // v2rayN default is often firefox
+                };
+
+                outbound.tls.record_fragment = true; // Found in working v2rayN config
 
                 // Add alpn only if explicitly present
                 if (node.alpn) {
@@ -108,9 +113,7 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    }
+                    headers: {}
                 };
 
                 // Host header logic: prefer wsHost, then sni (Matching v2rayN)
@@ -119,13 +122,14 @@ class ProxyService {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
 
-                // Handle Early Data (0-RTT) - Match numeric value from URL
+                // Handle Early Data (0-RTT) - Matching v2rayN working JSON
                 const edMatch = outbound.transport.path.match(/ed=(\d+)/);
                 if (edMatch) {
                     outbound.transport.max_early_data = parseInt(edMatch[1]);
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
-                } else if (outbound.transport.path.includes('ed=')) {
-                    outbound.transport.max_early_data = 2048;
+                } else if (outbound.transport.path.includes('ed=') || isTls) {
+                    // Default to 2560 for WS+TLS typical of Cloudflare/Argo as seen in JSON
+                    outbound.transport.max_early_data = 2560;
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
                 }
             } else if (node.transport === 'grpc') {
