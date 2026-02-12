@@ -68,6 +68,9 @@ class ProxyService {
                 outbound.alter_id = parseInt(node.alterId || 0);
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
+            } else if (node.type === 'vless') {
+                // Recommended for VLESS over WS/TLS to prevent some 502/dropped connections
+                outbound.packet_encoding = 'xudp';
             }
 
             // Handle Security (TLS / Reality)
@@ -82,10 +85,9 @@ class ProxyService {
                     insecure: !!node.insecure
                 };
 
-                // Only enable uTLS if fingerprint is specified
-                if (node.fp) {
-                    outbound.tls.utls = { enabled: true, fingerprint: node.fp };
-                }
+                // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
+                // Use provided fingerprint or default to chrome
+                outbound.tls.utls = { enabled: true, fingerprint: node.fp || 'chrome' };
 
                 // Add alpn if present or default for WS (Confirmed fix for Cloudflare 502)
                 if (node.alpn) {
@@ -114,6 +116,12 @@ class ProxyService {
                 };
                 if (node.wsHost) {
                     outbound.transport.headers['Host'] = node.wsHost;
+                }
+
+                // Handle Early Data (0-RTT) - Crucial for Argo Tunnels
+                if (outbound.transport.path.includes('ed=')) {
+                    outbound.transport.max_early_data = 2048;
+                    outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
                 }
             } else if (node.transport === 'grpc') {
                 outbound.transport = {
@@ -346,7 +354,7 @@ class ProxyService {
                 config.obfs_password = params.get('obfs-password');
 
             } else if (protocol === 'vless') {
-                config.uuid = rawUser;
+                config.uuid = rawUser || rawPass; // vless usually puts uuid in username part
 
             } else if (protocol === 'trojan') {
                 config.password = rawUser;
