@@ -127,15 +127,13 @@ class ProxyService {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
 
-                // Handle Early Data (0-RTT) - Matching v2rayN working JSON for Argo
+                // Handle Early Data (0-RTT) - ONLY if ed= is present in the path
                 const edMatch = outbound.transport.path.match(/ed=(\d+)/);
-                const isArgo = outbound.transport.path.toLowerCase().includes('argo') || node.name.toLowerCase().includes('argo');
-
                 if (edMatch) {
                     outbound.transport.max_early_data = parseInt(edMatch[1]);
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
-                } else if (isArgo || outbound.transport.path.includes('ed=')) {
-                    // Default to 2560 for Argo nodes (Hetzner/Modal typically use this in working configs)
+                } else if (outbound.transport.path.includes('ed=')) {
+                    // Default to 2560 if ed= exists but has no value
                     outbound.transport.max_early_data = 2560;
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
                 }
