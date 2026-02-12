@@ -135,9 +135,28 @@ class ProxyService {
             const config = this.generateConfig();
             const dataDir = path.dirname(this.configPath);
             if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+
+            // Log masked config for debugging (hide passwords/uuids)
+            const maskedConfig = JSON.parse(JSON.stringify(config));
+            maskedConfig.outbounds?.forEach(o => {
+                if (o.password) o.password = '***';
+                if (o.uuid) o.uuid = '***';
+                if (o.tls?.reality?.public_key) o.tls.reality.public_key = '***';
+            });
+            console.log('[ProxyService] Generated config:', JSON.stringify(maskedConfig, null, 2));
+
             fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2));
 
             this.stop();
+
+            // Verify sing-box version/availability before starting
+            try {
+                const { execSync } = await import('child_process');
+                const versionInfo = execSync(`${this.binPath} version`).toString();
+                console.log(`[ProxyService] sing-box environment OK: ${versionInfo.split('\n')[0]}`);
+            } catch (vErr) {
+                console.warn(`[ProxyService] Warning: Could not verify sing-box version: ${vErr.message}`);
+            }
 
             console.log(`[ProxyService] Starting sing-box with ${this.nodes.length} nodes...`);
 
@@ -212,6 +231,10 @@ class ProxyService {
             const nodeId = Math.random().toString(36).substring(2, 9);
             const name = decodeURIComponent(url.hash.slice(1)) || `${protocol}_${nodeId}`;
 
+            // Decoding userinfo part (e.g., uuid:pass or method:pass)
+            let userInfo = decodeURIComponent(url.username);
+            let [user, pass] = userInfo.split(':');
+
             let config = {
                 id: nodeId,
                 name: name,
@@ -234,24 +257,30 @@ class ProxyService {
             if (params.get('spx')) config.spx = params.get('spx');
 
             if (protocol === 'vless') {
-                config.uuid = url.username;
+                config.uuid = user;
             } else if (protocol === 'trojan') {
-                config.password = url.username;
+                config.password = user;
             } else if (protocol === 'ss') {
                 // ss://base64(method:password)@host:port
                 let auth = url.username;
                 try {
-                    auth = Buffer.from(auth, 'base64').toString('utf-8');
+                    // Try decoding if it looks like base64
+                    if (!auth.includes(':')) {
+                        auth = Buffer.from(auth, 'base64').toString('utf-8');
+                    }
                 } catch (e) { }
                 const [method, password] = auth.split(':');
                 config.type = 'shadowsocks';
-                config.password = password;
-                // sing-box shadowsocks needs method, we might need to store it
-                config.method = method;
-            } else if (protocol === 'tuic' || protocol === 'hysteria2') {
-                config.password = url.username;
+                config.password = password || user;
+                config.method = method || 'aes-256-gcm';
+            } else if (protocol === 'tuic') {
+                config.uuid = user;
+                config.password = pass || user;
+            } else if (protocol === 'hysteria2') {
+                config.password = user;
             } else if (protocol === 'socks' || protocol === 'http') {
-                // Base handled
+                if (user) config.username = user;
+                if (pass) config.password = pass;
             } else {
                 return null;
             }
@@ -290,7 +319,8 @@ class ProxyService {
 
         const startTime = Date.now();
         try {
-            const agent = new SocksProxyAgent(`socks5://127.0.0.1:${localPort}`);
+            // Use socks5h to ensure DNS resolution also goes through the proxy
+            const agent = new SocksProxyAgent(`socks5h://127.0.0.1:${localPort}`);
             // Use a small, reliable resource to test
             // proxy: false is critical to prevent axios from using global env proxies
             await axios.get('http://cp.cloudflare.com/generate_204', {
@@ -304,7 +334,8 @@ class ProxyService {
             // Detailed error for debugging failed tests
             const reason = e.response ? `HTTP ${e.response.status}` : e.message;
             console.error(`[ProxyService] Test failed for ${nodeId} on port ${localPort}:`, reason);
-            return -1; // Indicates failure
+            // Throw the reason so the API can catch it or return it
+            throw new Error(reason);
         }
     }
 }

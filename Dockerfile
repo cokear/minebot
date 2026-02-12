@@ -41,7 +41,7 @@ WORKDIR /app
 RUN apk add --no-cache tzdata curl ca-certificates
 
 # Install sing-box from edge community repo
-RUN apk add --no-cache sing-box --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+RUN apk add --no-cache sing-box --repository=https://dl-cdn.alpinelinux.org/alpine/edge/community
 
 # Copy server dependencies from stage 2
 COPY --from=server-deps /app/server/node_modules ./server/node_modules
