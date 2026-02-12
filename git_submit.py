@@ -16,7 +16,7 @@ def run_command(command):
 
 def main():
     run_command(["git", "add", "."])
-    run_command(["git", "commit", "-m", "fix: correct tls config generation for vmess and disable forced utls"])
+    run_command(["git", "commit", "-m", "fix: optimize ws host header and tls sni logic to prevent 502"])
     run_command(["git", "push", "origin", "main"])
 
 if __name__ == "__main__":

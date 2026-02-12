@@ -106,10 +106,15 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {
-                        'Host': node.wsHost || node.server
-                    }
+                    headers: {}
                 };
+                // Improved Host header logic: Python script leaves it empty if missing.
+                // We will try wsHost, then sni. If both missing, leave undefined (let sing-box/underlying lib handle it or send no host)
+                // Defaulting to node.server (IP) is often bad for CDN/Nginx.
+                const hostHeader = node.wsHost || node.sni;
+                if (hostHeader) {
+                    outbound.transport.headers['Host'] = hostHeader;
+                }
             } else if (node.transport === 'grpc') {
                 outbound.transport = {
                     type: 'grpc',
