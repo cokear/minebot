@@ -223,6 +223,8 @@ export interface ProxyNode {
   pbk?: string; // Reality publicKey
   sid?: string; // Reality shortId
   spx?: string; // Reality spiderX
+  max_early_data?: string | number;
+  early_data_header_name?: string;
 }
 
 class ApiService {
