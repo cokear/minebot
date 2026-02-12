@@ -39,7 +39,10 @@ class ProxyService {
             type: 'socks',
             tag: `in-${node.id}`,
             listen: '127.0.0.1',
-            listen_port: this.basePort + index
+            listen_port: this.basePort + index,
+            sniffing: {
+                enabled: false // Disable sniffing
+            }
         }));
 
         const outbounds = this.nodes.map(node => {
@@ -64,13 +67,13 @@ class ProxyService {
 
             // Protocol specific tuning
             if (node.type === 'vmess') {
-                outbound.security = node.security || 'auto';
+                outbound.security = node.security || 'none';
                 outbound.alter_id = parseInt(node.alterId || 0);
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             } else if (node.type === 'vless') {
-                // Passthrough packet_encoding if present (e.g. xudp)
-                if (node.packet_encoding) outbound.packet_encoding = node.packet_encoding;
+                // v2rayN and sing-box modern outbounds require xudp for WS/TLS stability
+                outbound.packet_encoding = node.packet_encoding || 'xudp';
             }
 
             // Handle Security (TLS / Reality)
@@ -119,10 +122,15 @@ class ProxyService {
                     headers: {}
                 };
 
-                // Host header logic: prefer wsHost, then sni, fallback to server if it's a domain
+                // Host header logic: prefer wsHost, then sni, fallback to server
+                // [V24] Crucial: Sync SNI and Host to prevent Cloudflare 404s
                 const hostHeader = node.wsHost || node.sni || node.server;
                 if (hostHeader && !hostHeader.match(/^\d+\.\d+\.\d+\.\d+$/)) {
                     outbound.transport.headers['Host'] = hostHeader;
+                    // Auto-sync SNI if it was missing to match the Host
+                    if (outbound.tls && !outbound.tls.server_name) {
+                        outbound.tls.server_name = hostHeader;
+                    }
                 }
 
                 // Handle Early Data (0-RTT) - Passthrough from node params
@@ -192,32 +200,8 @@ class ProxyService {
             final: 'direct'
         };
 
-        const dns = {
-            servers: [
-                {
-                    tag: 'google',
-                    address: 'https://8.8.8.8/dns-query',
-                    detour: 'direct' // Simplified for environment stability
-                },
-                {
-                    tag: 'local',
-                    address: '223.5.5.5',
-                    detour: 'direct'
-                }
-            ],
-            rules: [
-                {
-                    outbound: 'any',
-                    server: 'local'
-                }
-            ],
-            strategy: 'prefer_ipv4',
-            independent_cache: true
-        };
-
         return {
             log: { level: 'info' },
-            dns,
             inbounds,
             outbounds: [...outbounds, { type: 'direct', tag: 'direct' }],
             route: routes
