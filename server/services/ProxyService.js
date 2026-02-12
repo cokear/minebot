@@ -70,13 +70,21 @@ class ProxyService {
             }
 
             // Handle Security (TLS / Reality)
-            if (node.security === 'tls' || node.security === 'reality' || node.sni) {
+            // Handle Security (TLS / Reality)
+            // VMess uses 'tls' property, others use 'security'='tls'
+            const isTls = node.security === 'tls' || node.security === 'reality' || node.tls === true;
+
+            if (isTls || node.sni) {
                 outbound.tls = {
                     enabled: true,
                     server_name: node.sni || node.server,
-                    utls: { enabled: true, fingerprint: node.fp || 'chrome' },
                     insecure: !!node.insecure
                 };
+
+                // Only enable uTLS if fingerprint is specified (matching python reference)
+                if (node.fp) {
+                    outbound.tls.utls = { enabled: true, fingerprint: node.fp };
+                }
 
                 // Add alpn if present
                 if (node.alpn) {
