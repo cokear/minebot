@@ -211,6 +211,7 @@ export interface ProxyNode {
   password?: string;
   uuid?: string;
   sni?: string;
+  latency?: number;
 }
 
 class ApiService {
@@ -724,6 +725,24 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(nodes),
     });
+  }
+
+  async parseProxyLink(link: string): Promise<ProxyNode> {
+    return this.request('/api/proxy/parse-link', {
+      method: 'POST',
+      body: JSON.stringify({ link }),
+    });
+  }
+
+  async syncSubscription(url: string): Promise<ProxyNode[]> {
+    return this.request('/api/proxy/sync-subscription', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    });
+  }
+
+  async testProxyNode(id: string): Promise<{ success: boolean; latency: number }> {
+    return this.request(`/api/proxy/test/${id}`);
   }
 }
 

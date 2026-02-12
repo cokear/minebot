@@ -2,6 +2,8 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import axios from 'axios';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -139,6 +141,96 @@ class ProxyService {
     async restart(nodes) {
         this.setNodes(nodes);
         await this.start();
+    }
+
+    // Parse proxy links (vless, ss, trojan, tuic, hysteria2)
+    parseProxyLink(link) {
+        try {
+            const url = new URL(link);
+            const protocol = url.protocol.slice(0, -1);
+            const nodeId = Math.random().toString(36).substring(2, 9);
+            const name = decodeURIComponent(url.hash.slice(1)) || `${protocol}_${nodeId}`;
+
+            let config = {
+                id: nodeId,
+                name: name,
+                type: protocol,
+                server: url.hostname,
+                port: parseInt(url.port)
+            };
+
+            if (protocol === 'vless') {
+                config.uuid = url.username;
+                const params = new URLSearchParams(url.search);
+                if (params.get('sni')) config.sni = params.get('sni');
+            } else if (protocol === 'trojan') {
+                config.password = url.username;
+                const params = new URLSearchParams(url.search);
+                if (params.get('sni')) config.sni = params.get('sni');
+            } else if (protocol === 'ss') {
+                // ss://base64(method:password)@host:port
+                const auth = atob(url.username);
+                const [method, password] = auth.split(':');
+                config.type = 'shadowsocks';
+                config.password = password;
+                // Note: sing-box shadowsocks might need method, but our UI currently uses password-only logic
+                // We'll stick to basic fields for now.
+            } else if (protocol === 'tuic' || protocol === 'hysteria2') {
+                config.password = url.username;
+                const params = new URLSearchParams(url.search);
+                if (params.get('sni')) config.sni = params.get('sni');
+            } else if (protocol === 'socks' || protocol === 'http') {
+                // Already handled by base config
+            } else {
+                return null;
+            }
+
+            return config;
+        } catch (e) {
+            console.error('[ProxyService] Link parse error:', e.message);
+            return null;
+        }
+    }
+
+    // Sync from subscription URL (Base64 list)
+    async syncSubscription(url) {
+        try {
+            const response = await axios.get(url);
+            let content = response.data;
+            try {
+                content = Buffer.from(content, 'base64').toString('utf-8');
+            } catch (e) {
+                // Not base64 encoded, use raw
+            }
+
+            const links = content.split('\n').filter(l => l.trim());
+            const nodes = links.map(l => this.parseProxyLink(l.trim())).filter(Boolean);
+            return nodes;
+        } catch (e) {
+            console.error('[ProxyService] Subscription sync error:', e.message);
+            throw e;
+        }
+    }
+
+    // Test connectivity and latency
+    async testNode(nodeId) {
+        const localPort = this.getLocalPort(nodeId);
+        if (!localPort) throw new Error('Node not active in bridge');
+
+        const startTime = Date.now();
+        try {
+            const agent = new SocksProxyAgent(`socks5://127.0.0.1:${localPort}`);
+            // Use a small, reliable resource to test
+            await axios.get('http://cp.cloudflare.com/generate_204', {
+                httpAgent: agent,
+                httpsAgent: agent,
+                timeout: 5000
+            });
+            return Date.now() - startTime;
+        } catch (e) {
+            console.error(`[ProxyService] Test failed for ${nodeId}:`, e.message);
+            return -1; // Indicates failure
+        }
     }
 }
 

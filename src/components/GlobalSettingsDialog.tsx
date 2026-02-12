@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { api, TelegramConfig, ProxyNode } from "@/lib/api";
-import { Loader2, Save, Send, Lock, Globe, Plus, Trash2 } from "lucide-react";
+import { Loader2, Save, Send, Lock, Globe, Plus, Trash2, Link as LinkIcon, RefreshCw, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface GlobalSettingsDialogProps {
@@ -33,6 +33,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
     });
 
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
+    const [testLoading, setTestLoading] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         if (open) {
@@ -164,6 +165,53 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
         setProxyNodes(proxyNodes.map(n => n.id === id ? { ...n, ...updates } : n));
     };
 
+    const handleImportLink = async () => {
+        const link = prompt("请输入代理链接 (vless://, ss://, trojan://, tuic://, hysteria2://):");
+        if (!link) return;
+
+        try {
+            const node = await api.parseProxyLink(link);
+            setProxyNodes([...proxyNodes, node]);
+            toast({ title: "导入成功", description: `已添加节点: ${node.name}` });
+        } catch (error: any) {
+            toast({ title: "导入失败", description: error.message, variant: "destructive" });
+        }
+    };
+
+    const handleSyncSubscription = async () => {
+        const url = prompt("请输入订阅链接 URL:");
+        if (!url) return;
+
+        try {
+            setSaving(true);
+            const nodes = await api.syncSubscription(url);
+            setProxyNodes([...proxyNodes, ...nodes]);
+            toast({ title: "同步成功", description: `已导入 ${nodes.length} 个节点` });
+        } catch (error: any) {
+            toast({ title: "同步失败", description: error.message, variant: "destructive" });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleTestNode = async (id: string) => {
+        try {
+            setTestLoading(prev => ({ ...prev, [id]: true }));
+            const result = await api.testProxyNode(id);
+            if (result.success) {
+                updateProxyNode(id, { latency: result.latency });
+                toast({ title: "测试成功", description: `延迟: ${result.latency}ms` });
+            } else {
+                updateProxyNode(id, { latency: -1 });
+                toast({ title: "测试失败", description: "节点可能不可用", variant: "destructive" });
+            }
+        } catch (error: any) {
+            toast({ title: "测试错误", description: error.message, variant: "destructive" });
+        } finally {
+            setTestLoading(prev => ({ ...prev, [id]: false }));
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[600px] top-[15%] translate-y-0">
@@ -243,14 +291,23 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                             <div className="flex items-center space-x-2">
                                 <Globe className="h-5 w-5 text-primary" />
                                 <div>
-                                    <h3 className="font-medium">内置代理节点</h3>
                                     <p className="text-xs text-muted-foreground">管理用于各服务器卡片的代理节点 (支持 VLESS, Trojan, SS 等)</p>
                                 </div>
                             </div>
-                            <Button variant="outline" size="sm" onClick={addProxyNode}>
-                                <Plus className="h-4 w-4 mr-1" />
-                                添加节点
-                            </Button>
+                            <div className="flex items-center space-x-2">
+                                <Button variant="ghost" size="sm" onClick={handleImportLink}>
+                                    <LinkIcon className="h-4 w-4 mr-1 text-blue-500" />
+                                    导入链接
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={handleSyncSubscription}>
+                                    <RefreshCw className="h-4 w-4 mr-1 text-green-500" />
+                                    同步订阅
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={addProxyNode}>
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    手动添加
+                                </Button>
+                            </div>
                         </div>
 
                         {proxyNodes.length === 0 ? (
@@ -271,14 +328,30 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                                                     placeholder="节点名称"
                                                 />
                                             </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                                                onClick={() => removeProxyNode(node.id)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            <div className="flex items-center space-x-1">
+                                                {node.latency !== undefined && (
+                                                    <Badge variant={node.latency > 0 ? (node.latency < 500 ? "secondary" : "outline") : "destructive"} className="h-8">
+                                                        {node.latency > 0 ? `${node.latency}ms` : "超时"}
+                                                    </Badge>
+                                                )}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-blue-500"
+                                                    onClick={() => handleTestNode(node.id)}
+                                                    disabled={testLoading[node.id]}
+                                                >
+                                                    {testLoading[node.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={() => removeProxyNode(node.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
