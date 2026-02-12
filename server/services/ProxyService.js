@@ -45,9 +45,8 @@ class ProxyService {
             tag: `in-${node.id}`,
             listen: '127.0.0.1', // Ensure binding to localhost
             listen_port: this.basePort + index,
-            sniffing: {
-                enabled: false // Disable sniffing
-            }
+            listen: '127.0.0.1', // Ensure binding to localhost
+            listen_port: this.basePort + index
         }));
 
         const outbounds = this.nodes.map(node => {
