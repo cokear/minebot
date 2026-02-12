@@ -69,8 +69,7 @@ class ProxyService {
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             } else if (node.type === 'vless') {
-                // Highly recommended for VLESS over WS/TLS to prevent some 502/dropped connections
-                outbound.packet_encoding = 'xudp';
+                // Keep it pure by default to match v2rayN unless explicitly requested
             }
 
             // Handle Security (TLS / Reality)
@@ -89,11 +88,9 @@ class ProxyService {
                 // Default to chrome if not specified
                 outbound.tls.utls = { enabled: true, fingerprint: node.fp || 'chrome' };
 
-                // Force ALPN http/1.1 for WS nodes over TLS (Confirmed fix for Cloudflare 502)
+                // Add alpn only if explicitly present
                 if (node.alpn) {
                     outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : node.alpn.split(',');
-                } else if (node.transport === 'ws') {
-                    outbound.tls.alpn = ['http/1.1'];
                 }
 
                 if (node.security === 'reality') {
@@ -111,17 +108,23 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {}
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
                 };
 
-                // Host header logic: prefer wsHost, then sni, then fallback to server
-                const hostHeader = node.wsHost || node.sni || node.server;
+                // Host header logic: prefer wsHost, then sni (Matching v2rayN)
+                const hostHeader = node.wsHost || node.sni;
                 if (hostHeader && !hostHeader.match(/^\d+\.\d+\.\d+\.\d+$/)) {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
 
-                // Handle Early Data (0-RTT) - Crucial for Argo Tunnels
-                if (outbound.transport.path.includes('ed=')) {
+                // Handle Early Data (0-RTT) - Match numeric value from URL
+                const edMatch = outbound.transport.path.match(/ed=(\d+)/);
+                if (edMatch) {
+                    outbound.transport.max_early_data = parseInt(edMatch[1]);
+                    outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
+                } else if (outbound.transport.path.includes('ed=')) {
                     outbound.transport.max_early_data = 2048;
                     outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
                 }

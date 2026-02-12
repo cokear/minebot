@@ -11,5 +11,5 @@ def run_cmd(cmd):
     return res.returncode
 
 run_cmd("git add .")
-run_cmd('git commit -m "fix: final proxy alignment (v11: smart defaults, robust parsing, alpn/uTLS/xudp)"')
+run_cmd('git commit -m "fix: v12 pixel-perfect proxy alignment (dynamic ed, User-Agent, host sync)"')
 run_cmd("git push origin main")
