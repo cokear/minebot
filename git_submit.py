@@ -16,7 +16,7 @@ def run_command(command):
 
 def main():
     run_command(["git", "add", "."])
-    run_command(["git", "commit", "-m", "fix: truncate server uuid for panel api and add ws user-agent"])
+    run_command(["git", "commit", "-m", "revert: panel api uuid truncation logic as requested by user"])
     run_command(["git", "push", "origin", "main"])
 
 if __name__ == "__main__":

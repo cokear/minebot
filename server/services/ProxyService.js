@@ -86,9 +86,12 @@ class ProxyService {
                     outbound.tls.utls = { enabled: true, fingerprint: node.fp };
                 }
 
-                // Add alpn if present
+                // Add alpn if present or default for WS
                 if (node.alpn) {
                     outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : node.alpn.split(',');
+                } else if (node.transport === 'ws') {
+                    // Modern CDNs often require http/1.1 for WS upgrades
+                    outbound.tls.alpn = ['http/1.1'];
                 }
 
                 if (node.security === 'reality') {
