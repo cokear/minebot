@@ -578,8 +578,12 @@ export class PanelInstance {
     }
 
     try {
-      // Clean panel URL (ensure no trailing slash and correct prefix)
-      const baseUrl = panel.url.replace(/\/+$/, '');
+      // 1. Clean panel URL (remove trailing slashes and /api/client suffix if present)
+      let baseUrl = panel.url.trim().replace(/\/+$/, '');
+      if (baseUrl.endsWith('/api/client')) {
+        baseUrl = baseUrl.slice(0, -11); // Remove last 11 chars
+      }
+
       const url = `${baseUrl}/api/client/servers/${panel.serverId}/command`;
 
       this.log('info', `发送面板命令: ${command} -> ${url}`, '🖥️');
